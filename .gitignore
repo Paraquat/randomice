@@ -31,3 +31,6 @@
 *.out
 *.app
 randomice
+
+# Test directory
+test

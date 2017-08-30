@@ -53,7 +53,7 @@ std::ostream& operator<< (std::ostream& os, Atom& a)
       << std::left << std::setw(4) << oss.str() \
       << std::right << std::setw(20) << a.r[0] \
       << std::right << std::setw(20) << a.r[1] \
-      << std::right << std::setw(20) << a.r[2] << "\n";
+      << std::right << std::setw(20) << a.r[2];
   return os;
 }
 
@@ -66,6 +66,6 @@ std::ofstream& operator<< (std::ofstream& ofs, Atom& a)
       << std::left << std::setw(4) << oss.str()
       << std::right << std::setw(20) << a.r[0] \
       << std::right << std::setw(20) << a.r[1] \
-      << std::right << std::setw(20) << a.r[2] << "\n";
+      << std::right << std::setw(20) << a.r[2];
   return ofs;
 }
