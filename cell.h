@@ -6,16 +6,27 @@
 
 class Cell {
   private:
+    bool frac;
+    Eigen::MatrixXd dt;
+    Eigen::Matrix3d lat_inv;
+
+    void wrap(void);
+    void frac2cart(Atom&);
+    void frac2cart_all(void);
+    void cart2frac(Atom&);
+    void cart2frac_all(void);
+    Eigen::Vector3d mic_cart(Atom&, Atom&);
+    Eigen::Vector3d mic_frac(Atom&, Atom&);
+    void get_dt(void);
   public:
     std::string name;
     int natoms;
-    bool frac;
-    Eigen::Matrix3d lat, lat_inv;
+    Eigen::Matrix3d lat;
     std::vector<Atom> atoms;
-    Eigen::MatrixXd dt;
 
     Cell();
     virtual ~Cell();
+    Cell(Eigen::Matrix3d);
     Cell(Eigen::Matrix3d, std::vector<Atom>);
     Cell(const Cell&);
 
@@ -25,16 +36,5 @@ class Cell {
     void add_atom(Atom);
     void read_cell(std::string);
     void write_cell(std::string);
-    // void recell(void);
-    // void uncell(void);
-
-    // double frac2cart_disp(Eigen::Vector3d);
-    void wrap(void);
-    void frac2cart(Atom&);
-    void frac2cart_all(void);
-    void cart2frac(Atom&);
-    void cart2frac_all(void);
-    Eigen::Vector3d mic_cart(Atom&, Atom&);
-    Eigen::Vector3d mic_frac(Atom&, Atom&);
-    void get_dt(void);
+    Cell super(int, int, int);
 };

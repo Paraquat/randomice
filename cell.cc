@@ -12,6 +12,14 @@ Cell::~Cell()
 {
 }
 
+// Initialise the box, no atoms
+Cell::Cell(Eigen::Matrix3d l)
+{
+  lat = l;
+  natoms = 0;
+  frac = true;
+}
+
 // Initialise using matrix of lattice vectors and list of atoms
 Cell::Cell(Eigen::Matrix3d l, std::vector<Atom> at)
 {
@@ -60,6 +68,7 @@ void Cell::read_cell(std::string fname)
   std::string         species;
   double              x, y, z;
   int                 label;
+  bool                readatoms = false;
 
   if (!infile){
     std::cout << "Error opening file " << fname << std::endl;
@@ -88,16 +97,28 @@ void Cell::read_cell(std::string fname)
     label = 1;
     if (linestr == "%block positions_frac"){
       frac = true;
+      readatoms = true;
+    } else if (linestr == "%block positions_abs") {
+      frac = false;
+      readatoms = true;
+    }
+    if (readatoms){
       while (std::getline(infile, line)){
         std::istringstream  iss(line);
         linestr = iss.str();
-        std::transform(linestr.begin(), linestr.end(), linestr.begin(), \
-                       ::tolower);
+        if (linestr.at(0) == '%'){
+          std::transform(linestr.begin(), linestr.end(), linestr.begin(), \
+                         ::tolower);
+        }
         if (linestr == "%endblock positions_frac") break;
+        if (linestr == "%endblock positions_abs") break;
         iss >> species >> x >> y >> z;
         add_atom(Atom(species, label, x, y, z));
         label++;
       }
+    }
+    if (frac == false) {
+      cart2frac_all();
     }
   }
 }
@@ -171,8 +192,8 @@ void Cell::cart2frac_all(void)
   for (int i=0; i<natoms; i++) {
     cart2frac(atoms[i]);
   }  
-  wrap();
   frac = true;
+  wrap();
 }
 
 // Compute the vector between two atoms with PBCs using the Minimum Image
@@ -215,4 +236,40 @@ void  Cell::get_dt(void)
       dt(j,i) = dt(i,j);
     }
   }
+}
+
+// Generate a axbxc supercell
+Cell Cell::super(int a, int b, int c)
+{
+  Eigen::Vector3d t, rt, scdim;
+  Eigen::Matrix3d lat_super;
+  std::vector<Atom> atoms_super;
+
+  assert(frac == true);
+  lat_super.row(0) = lat.row(0)*static_cast<double>(a);
+  lat_super.row(1) = lat.row(1)*static_cast<double>(b);
+  lat_super.row(2) = lat.row(2)*static_cast<double>(c);
+  Cell sc(lat_super);
+
+  scdim << static_cast<double>(a), static_cast<double>(b), \
+           static_cast<double>(c);
+  int label = 1;
+  for (int i=0; i<a; i++){
+    for (int j=0; j<b; j++){
+      for (int k=0; k<c; k++){
+        t << static_cast<double>(i), static_cast<double>(j), \
+             static_cast<double>(k);
+
+        for (int n=0; n<natoms; n++){
+          rt = atoms[n].r + t;
+          for (int m=0; m<=2; m++){
+            rt(m) = rt(m)/scdim(m);
+          }
+          sc.add_atom(Atom(atoms[n].name, label, rt));
+          label += 1;
+        }
+      }
+    }
+  }
+  return sc;
 }
