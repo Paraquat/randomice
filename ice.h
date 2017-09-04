@@ -6,5 +6,8 @@ class Ice: public Cell {
   public:
     Ice();
     virtual ~Ice();
+    Ice(Cell&);
+
+    void get_h_pos(void);
 
 };

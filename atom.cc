@@ -13,6 +13,7 @@ Atom::Atom(std::string symbol, int i, double x, double y, double z)
   name = symbol;
   label = i;
   r = Eigen::Vector3d(x, y, z);
+  occupied = true;
 }
 
 Atom::Atom(std::string symbol, int i, Eigen::Vector3d v)
@@ -20,6 +21,16 @@ Atom::Atom(std::string symbol, int i, Eigen::Vector3d v)
   name = symbol;
   label = i;
   r = v;
+  occupied = true;
+}
+
+// Allow addition of an unoccupied atomic site
+Atom::Atom(std::string symbol, int i, Eigen::Vector3d v, bool occ)
+{
+  name = symbol;
+  label = i;
+  r = v;
+  occupied = occ;
 }
 
 Atom::Atom(const Atom& a)
@@ -27,6 +38,7 @@ Atom::Atom(const Atom& a)
   name = a.name;
   label = a.label;
   r = a.r;
+  occupied = true;
 }
 
 bool Atom::operator== (const Atom& a)
@@ -68,4 +80,18 @@ std::ofstream& operator<< (std::ofstream& ofs, Atom& a)
       << std::right << std::setw(20) << a.r[1] \
       << std::right << std::setw(20) << a.r[2];
   return ofs;
+}
+
+void Atom::add_nn(atom_ptr n)
+{
+  nn.push_back(n);
+}
+
+void Atom::print_nn(void)
+{
+  std::cout << label << ": ";
+  for (int i=0; i<nn.size(); i++){
+    std::cout << (*nn[i]).label << " ";
+  }
+  std::cout << std::endl;
 }

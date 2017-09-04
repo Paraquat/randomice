@@ -1,7 +1,7 @@
 #include "cell.h"
 
 // Default construcotr
-Cell::Cell()
+Cell::Cell() 
 {
   natoms = 0;
   frac = true;
@@ -21,7 +21,7 @@ Cell::Cell(Eigen::Matrix3d l)
 }
 
 // Initialise using matrix of lattice vectors and list of atoms
-Cell::Cell(Eigen::Matrix3d l, std::vector<Atom> at)
+Cell::Cell(Eigen::Matrix3d l, std::deque<Atom> at)
 {
   lat = l;
   atoms = at;
@@ -35,6 +35,17 @@ Cell::Cell(const Cell& cell)
   atoms = cell.atoms;
   natoms = cell.natoms;
   frac = cell.frac;
+}
+
+// Copy constructor
+Cell& Cell::operator= (const Cell& cell)
+{
+  if (this == &cell) return *this;
+  lat = cell.lat;
+  atoms = cell.atoms;
+  natoms = cell.natoms;
+  frac = cell.frac;
+  return *this;
 }
 
 // Write to ostream
@@ -54,7 +65,7 @@ std::ostream& operator<< (std::ostream& os, Cell& cell)
 }
 
 // Add an atom to the list
-void Cell::add_atom(Atom a)
+void Cell::add_atom(Atom& a)
 {
   atoms.push_back(a);
   natoms++;
@@ -113,7 +124,8 @@ void Cell::read_cell(std::string fname)
         if (linestr == "%endblock positions_frac") break;
         if (linestr == "%endblock positions_abs") break;
         iss >> species >> x >> y >> z;
-        add_atom(Atom(species, label, x, y, z));
+        Atom a(species, label, x, y, z);
+        add_atom(a);
         label++;
       }
     }
@@ -177,7 +189,7 @@ void Cell::frac2cart_all(void)
   for (int i=0; i<natoms; i++) {
     frac2cart(atoms[i]);
   }  
-  frac = true;
+  frac = false;
 }
 
 // Convert one atomic coordinate from Cartesian to fractional
@@ -198,11 +210,11 @@ void Cell::cart2frac_all(void)
 
 // Compute the vector between two atoms with PBCs using the Minimum Image
 // Convention (MIC) in Cartesian basis --- only works with an orthorhombic cell
-Eigen::Vector3d Cell::mic_cart(Atom& a, Atom& b)
+Eigen::Vector3d Cell::mic_cart(Atom a, Atom b)
 {
   Eigen::Vector3d d;
 
-  d = a.r - b.r;
+  d = b.r - a.r;
   for (int i=0; i<=2; i++) {
     d(i) = d(i) - round(d(i)/lat(i,i))*lat(i,i);
   }
@@ -211,11 +223,11 @@ Eigen::Vector3d Cell::mic_cart(Atom& a, Atom& b)
 
 // Compute the vector between two atoms with PBCs using the Minimum Image
 // Convention in fractional coordinates
-Eigen::Vector3d Cell::mic_frac(Atom& a, Atom& b)
+Eigen::Vector3d Cell::mic_frac(Atom a, Atom b)
 {
   Eigen::Vector3d d;
 
-  d = a.r - b.r;
+  d = b.r - a.r;
   for (int i=0; i<=2; i++) {
     if (d(i) > 0.5) d(i) -= 1.0;
     else if (d(i) < -0.5) d(i) += 1.0;
@@ -265,11 +277,28 @@ Cell Cell::super(int a, int b, int c)
           for (int m=0; m<=2; m++){
             rt(m) = rt(m)/scdim(m);
           }
-          sc.add_atom(Atom(atoms[n].name, label, rt));
+          Atom a(atoms[n].name, label, rt);
+          sc.add_atom(a);
           label += 1;
         }
       }
     }
   }
   return sc;
+}
+
+// Find nearest neighbours within cutoff
+void Cell::get_nn(double cutoff)
+{
+  get_dt();
+  for (int i=0; i<natoms; i++){
+    for (int j=0; j<natoms; j++){
+      if (i != j){
+        if (dt(i,j) < cutoff){
+          Atom::atom_ptr ptr(new Atom(atoms[j]));
+          atoms[i].add_nn(ptr);
+        }
+      }
+    }
+  } 
 }

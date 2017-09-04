@@ -6,10 +6,14 @@ int main(int argc, char* argv[]){
 
   po::options_description desc("Allowed options");
   std::string infname;
+  std::vector<int> scdim;
+  int scx, scy, scz;
 
   desc.add_options()
     ("help,h", "Print help information")
     ("infile,i", po::value< std::string >(), "Input structure file")
+    ("supercell,s", po::value<std::vector<int> >() -> multitoken(), 
+     "Supercell dimensions (a x b x c)")
     ;
   po::variables_map vm;
   po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -24,13 +28,29 @@ int main(int argc, char* argv[]){
   } else {
     std::cout << "No input structure file specified" << std::endl;
   }
+  if (!vm["supercell"].empty() &&
+      (scdim = vm["supercell"].as<std::vector<int> >()).size() == 3){
+    scx = scdim[0];
+    scy = scdim[1];
+    scz = scdim[2];
+  } else {
+    scx = 1;
+    scy = 1;
+    scz = 1;
+  }
 
   Cell cell;
   Cell sc;
 
   cell.read_cell(infname);
-  sc = cell.super(2, 2, 2);
-  std::cout << sc;
+  sc = cell.super(scx, scy, scz);
+  Ice ice(sc);
+  ice.get_h_pos();
+  // for (int i=0; i<sc.natoms; i++){
+  //   sc.atoms[i].print_nn();
+  // }
+  // std::cout << ice << std::endl;
+  ice.write_cell("test.cell");
 
   return 0;
 }
