@@ -154,7 +154,9 @@ void Cell::write_cell(std::string fname)
   else outfile << "%BLOCK positions_abs" << std::endl;
 
   for (int i=0; i<natoms; i++) {
-    outfile << atoms[i] << std::endl;
+    if (atoms[i].occupied){
+      outfile << atoms[i] << std::endl;
+    }
   }
 
   if (frac) outfile << "%ENDBLOCK positions_frac" << std::endl << std::endl;
@@ -292,6 +294,7 @@ void Cell::get_nn(double cutoff)
 {
   get_dt();
   for (int i=0; i<natoms; i++){
+    atoms[i].nn.clear();
     for (int j=0; j<natoms; j++){
       if (i != j){
         if (dt(i,j) < cutoff){
@@ -301,4 +304,27 @@ void Cell::get_nn(double cutoff)
       }
     }
   } 
+}
+
+// Check whether atom c lines on a line connecting atoms a and b
+bool Cell::isPointOnLine(Atom& a, Atom& b, Atom& c)
+{
+  Eigen::Vector3d v1, v2, cp;
+  double dp;
+  bool on_line = false;
+
+  assert(frac == false);
+  v1 = mic_cart(b, a);
+  v2 = mic_cart(c, a);
+  cp = v1.cross(v2);
+  dp = v1.dot(v2);
+  // std::cout << "cp: " << cp.norm() << " dp: " << dp << " |v1|^2: " << v1.squaredNorm() << std::endl;
+  if (cp.norm() < small){
+    if (dp > 0.0){
+      if (dp < v1.squaredNorm()){
+        on_line = true;
+      }
+    }
+  }
+  return on_line;
 }

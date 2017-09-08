@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <regex>
 #include <Eigen/LU>     // required for matrix.inverse()
+#include <Eigen/Dense>  // required for dot and cross products
 
 class Cell {
   private:
@@ -19,6 +20,7 @@ class Cell {
     Eigen::Vector3d mic_frac(Atom, Atom);
     void get_dt(void);
     void get_nn(double);
+    bool isPointOnLine(Atom&, Atom&, Atom&);
   public:
     std::string name;
     int natoms;

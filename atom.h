@@ -6,16 +6,18 @@
 #include <deque>
 #include <boost/shared_ptr.hpp>
 
+#ifndef ATOM_H
+#define ATOM_H
+
 class Atom {
   private:
   public:
     std::string name;
     Eigen::Vector3d r;
-    int label;
+    int label, nneighbour;
     bool occupied;
     typedef boost::shared_ptr<Atom> atom_ptr;
     std::deque<atom_ptr> nn;
-    // std::vector<&Atom*> nn;      // nearest neighbours
 
     Atom();
     virtual ~Atom();
@@ -31,3 +33,5 @@ class Atom {
     void add_nn(atom_ptr);
     void print_nn(void);
 };
+
+#endif  // ATOM_H

@@ -46,11 +46,12 @@ int main(int argc, char* argv[]){
   sc = cell.super(scx, scy, scz);
   Ice ice(sc);
   ice.get_h_pos();
-  // for (int i=0; i<sc.natoms; i++){
-  //   sc.atoms[i].print_nn();
-  // }
-  // std::cout << ice << std::endl;
-  ice.write_cell("test.cell");
+  ice.get_waters();
+  // ice.print_ice();
+  ice.get_water_nn(oo_max);
+  ice.get_hbonds();
+  std::cout << ice.hbonds[0] << std::endl;
+  // ice.write_cell("test.cell");
 
   return 0;
 }
