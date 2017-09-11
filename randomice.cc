@@ -50,8 +50,7 @@ int main(int argc, char* argv[]){
   // ice.print_ice();
   ice.get_water_nn(oo_max);
   ice.get_hbonds();
-  std::cout << ice.hbonds[0] << std::endl;
-  // ice.write_cell("test.cell");
+  ice.write_cell("test.cell");
 
   return 0;
 }

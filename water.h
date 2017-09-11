@@ -4,7 +4,7 @@
 #define WATER_H
 
 class Hbond;
-typedef boost::shared_ptr<Hbond> hbond_ptr;
+typedef std::shared_ptr<Hbond> hbond_ptr;
 
 class Water {
   private:
@@ -15,7 +15,7 @@ class Water {
     std::deque<hbond_ptr> HBlist;
     std::string ionic;
     int label, nneighbours;
-    typedef boost::shared_ptr<Water> water_ptr;
+    typedef std::shared_ptr<Water> water_ptr;
     std::deque<water_ptr> nn;
 
     Water();

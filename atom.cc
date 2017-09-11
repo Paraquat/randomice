@@ -41,7 +41,7 @@ Atom::Atom(const Atom& a)
   name = a.name;
   label = a.label;
   r = a.r;
-  occupied = true;
+  occupied = a.occupied;
   nneighbour = 0;
 }
 
@@ -57,6 +57,7 @@ Atom& Atom::operator= (const Atom& a)
   name = a.name;
   label = a.label;
   r = a.r;
+  occupied = a.occupied;
   nneighbour = 0;
   return *this;
 }

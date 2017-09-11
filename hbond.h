@@ -4,7 +4,7 @@
 #define HBOND_H
 
 class Water;
-typedef boost::shared_ptr<Water> water_ptr;
+typedef std::shared_ptr<Water> water_ptr;
 
 class Hbond {
   private:
@@ -12,7 +12,7 @@ class Hbond {
   public:
     Atom::atom_ptr O1, O2, H1, H2;
     std::string bjerrum;
-    typedef boost::shared_ptr<Hbond> hbond_ptr;
+    typedef std::shared_ptr<Hbond> hbond_ptr;
 
     Hbond();
     virtual ~Hbond();

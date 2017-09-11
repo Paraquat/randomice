@@ -23,6 +23,7 @@ void Ice::get_h_pos(void)
 {
   Eigen::Vector3d oo, r_h;
   std::string species = "H";
+  bool occ = false;
   Atom a;
 
   if (frac == true) frac2cart_all();
@@ -31,7 +32,8 @@ void Ice::get_h_pos(void)
     for (int j=0; j<atoms[i].nn.size(); j++){
       oo = mic_cart(atoms[i], *atoms[i].nn[j]);
       r_h = atoms[i].r + oh_default*oo.normalized();
-      a = Atom(species, natoms+1, r_h, false);
+      a = Atom(species, natoms+1, r_h, occ);
+      std::cout << a.occupied << std::endl;
       add_atom(a);
     }
   }
@@ -89,39 +91,46 @@ void Ice::get_water_nn(double cutoff)
 
 void Ice::get_hbonds(void)
 {
-  Atom::atom_ptr h1, h2;
   nhbond = 0;
   get_nn(oo_max);
   for (int i=0; i<nwater; i++){
-    for (int j=i+1; j<nwater; j++){
-      if (isPointOnLine(*waters[i].O, *waters[j].O, *waters[i].H1)){
-        h1.reset(new Atom(*waters[i].H1));
-      }
-      else if (isPointOnLine(*waters[i].O, *waters[j].O, *waters[i].H2)){
-        h1.reset(new Atom(*waters[i].H2));
-      }
-      else if (isPointOnLine(*waters[i].O, *waters[j].O, *waters[i].H3)){
-        h1.reset(new Atom(*waters[i].H3));
-      }
-      else if(isPointOnLine(*waters[i].O, *waters[j].O, *waters[i].H4)){
-        h1.reset(new Atom(*waters[i].H4));
-      }
-      // else std::cout << "Failed to find h1" << std::endl;
+    Water::water_ptr w1(new Water(waters[i]));
+    assert(waters[i].nn.size() == 4);
+    for (int j=0; j<4; j++){
+      Water::water_ptr w2(new Water(*waters[i].nn[j]));
+      Atom::atom_ptr h1, h2;
 
-      if(isPointOnLine(*waters[i].O, *waters[j].O, *waters[j].H1)){
-        h2.reset(new Atom(*waters[j].H1));
+      if (isPointOnLine(*w1->O, *w2->O, *w1->H1)){
+        h1 = w1->H1;
       }
-      else if(isPointOnLine(*waters[i].O, *waters[j].O, *waters[j].H2)){
-        h2.reset(new Atom(*waters[j].H2));
+      else if (isPointOnLine(*w1->O, *w2->O, *w1->H2)){
+        h1 = w1->H2;
       }
-      else if(isPointOnLine(*waters[i].O, *waters[j].O, *waters[j].H3)){
-        h2.reset(new Atom(*waters[j].H3));
+      else if (isPointOnLine(*w1->O, *w2->O, *w1->H3)){
+        h1 = w1->H3;
       }
-      else if(isPointOnLine(*waters[i].O, *waters[j].O, *waters[j].H4)){
-        h2.reset(new Atom(*waters[j].H4));
+      else if (isPointOnLine(*w1->O, *w2->O, *w1->H4)){
+        h1 = w1->H4;
       }
-      // else std::cout << "Failed to find h2" << std::endl;
-      Hbond hb(waters[i].O, waters[j].O, h1, h2);
+      else std::cout << "Failed to find h1 for water " << w1->label 
+                     << std::endl;
+
+      if (isPointOnLine(*w1->O, *w2->O, *w2->H1)){
+        h2 = w2->H1;
+      }
+      else if (isPointOnLine(*w1->O, *w2->O, *w2->H2)){
+        h2 = w2->H2;
+      }
+      else if (isPointOnLine(*w1->O, *w2->O, *w2->H3)){
+        h2 = w2->H3;
+      }
+      else if (isPointOnLine(*w1->O, *w2->O, *w2->H4)){
+        h2 = w2->H4;
+      }
+      else std::cout << "Failed to find h2 for water " << w2->label 
+                     << std::endl;
+
+      Hbond hb((*w1).O, (*w2).O , h1, h2);
 
       add_hbond(hb);
     }

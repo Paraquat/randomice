@@ -156,6 +156,7 @@ void Cell::write_cell(std::string fname)
   for (int i=0; i<natoms; i++) {
     if (atoms[i].occupied){
       outfile << atoms[i] << std::endl;
+      // std::cout << atoms[i].occupied << std::endl;
     }
   }
 
@@ -319,6 +320,7 @@ bool Cell::isPointOnLine(Atom& a, Atom& b, Atom& c)
   cp = v1.cross(v2);
   dp = v1.dot(v2);
   // std::cout << "cp: " << cp.norm() << " dp: " << dp << " |v1|^2: " << v1.squaredNorm() << std::endl;
+  // Should really check also whether c(i) < b(i) and c(i) > a(i)
   if (cp.norm() < small){
     if (dp > 0.0){
       if (dp < v1.squaredNorm()){

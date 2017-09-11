@@ -4,7 +4,6 @@
 #include <sstream>
 #include <Eigen/Core>
 #include <deque>
-#include <boost/shared_ptr.hpp>
 
 #ifndef ATOM_H
 #define ATOM_H
@@ -16,7 +15,7 @@ class Atom {
     Eigen::Vector3d r;
     int label, nneighbour;
     bool occupied;
-    typedef boost::shared_ptr<Atom> atom_ptr;
+    typedef std::shared_ptr<Atom> atom_ptr;
     std::deque<atom_ptr> nn;
 
     Atom();
