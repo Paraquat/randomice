@@ -5,6 +5,7 @@
 
 class Ice: public Cell {
   private:
+    gsl_rng *r;
   public:
     std::deque<Water> waters;
     std::deque<Hbond> hbonds;
@@ -21,4 +22,13 @@ class Ice: public Cell {
     void get_water_nn(double);
     void get_hbonds(void);
     void print_ice(void);
+
+    void init_rng(void);
+    int rng_int(int);
+    double rng_uniform(void);
+    void populate_h_random(void);
+    int o_two_coordinated(void);
+    void buch_mc_correct(void);
+
+    void write_cell(std::string);
 };

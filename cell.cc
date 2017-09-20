@@ -135,7 +135,7 @@ void Cell::read_cell(std::string fname)
   }
 }
 
-// Write object ot a .cell file
+// Write object to a .cell file
 void Cell::write_cell(std::string fname)
 {
   std::ofstream     outfile(fname.c_str());
@@ -156,7 +156,6 @@ void Cell::write_cell(std::string fname)
   for (int i=0; i<natoms; i++) {
     if (atoms[i].occupied){
       outfile << atoms[i] << std::endl;
-      // std::cout << atoms[i].occupied << std::endl;
     }
   }
 
@@ -167,6 +166,7 @@ void Cell::write_cell(std::string fname)
 // Wrap the atoms back into the unit cell if necessary
 void Cell::wrap(void)
 {
+  std::cout << "Wrapping atoms into unit cell" << std::endl;
   assert(frac == true);
   for (int i=0; i<natoms; i++) {
     for (int j=0; j<=2; j++) {
@@ -188,6 +188,7 @@ void Cell::frac2cart(Atom& a)
 // Convert all coordinates from fractional to Cartesian
 void Cell::frac2cart_all(void)
 {
+  std::cout << "Converting coordinates from fractional to Cartesian" << std::endl;
   wrap();
   for (int i=0; i<natoms; i++) {
     frac2cart(atoms[i]);
@@ -204,6 +205,7 @@ void Cell::cart2frac(Atom& a)
 // Convert all atomic coordinates from Cartesian to fractional
 void Cell::cart2frac_all(void)
 {
+  std::cout << "Converting coordinates from Cartesian to fractional" << std::endl;
   for (int i=0; i<natoms; i++) {
     cart2frac(atoms[i]);
   }  
@@ -213,7 +215,7 @@ void Cell::cart2frac_all(void)
 
 // Compute the vector between two atoms with PBCs using the Minimum Image
 // Convention (MIC) in Cartesian basis --- only works with an orthorhombic cell
-Eigen::Vector3d Cell::mic_cart(Atom a, Atom b)
+Eigen::Vector3d Cell::mic_cart(Atom& a, Atom& b)
 {
   Eigen::Vector3d d;
 
@@ -226,7 +228,7 @@ Eigen::Vector3d Cell::mic_cart(Atom a, Atom b)
 
 // Compute the vector between two atoms with PBCs using the Minimum Image
 // Convention in fractional coordinates
-Eigen::Vector3d Cell::mic_frac(Atom a, Atom b)
+Eigen::Vector3d Cell::mic_frac(Atom& a, Atom& b)
 {
   Eigen::Vector3d d;
 
@@ -241,6 +243,7 @@ Eigen::Vector3d Cell::mic_frac(Atom a, Atom b)
 // Compute the distance table
 void  Cell::get_dt(void)
 {
+  std::cout << "Building distance table" << std::endl;
   Eigen::Vector3d d;
   dt.setZero(natoms,natoms);
   for (int i=0; i<natoms; i++) {
@@ -258,7 +261,6 @@ Cell Cell::super(int a, int b, int c)
 {
   Eigen::Vector3d t, rt, scdim;
   Eigen::Matrix3d lat_super;
-  std::vector<Atom> atoms_super;
 
   assert(frac == true);
   lat_super.row(0) = lat.row(0)*static_cast<double>(a);
@@ -290,16 +292,17 @@ Cell Cell::super(int a, int b, int c)
   return sc;
 }
 
-// Find nearest neighbours within cutoff
+// // Find nearest neighbours within cutoff
 void Cell::get_nn(double cutoff)
 {
+  std::cout << "Finding nearest neighbours within cutoff " << cutoff << std::endl;
   get_dt();
   for (int i=0; i<natoms; i++){
     atoms[i].nn.clear();
     for (int j=0; j<natoms; j++){
       if (i != j){
         if (dt(i,j) < cutoff){
-          Atom::atom_ptr ptr(new Atom(atoms[j]));
+          Atom::atom_ptr ptr = std::make_shared<Atom>(atoms[j]);
           atoms[i].add_nn(ptr);
         }
       }
@@ -315,11 +318,11 @@ bool Cell::isPointOnLine(Atom& a, Atom& b, Atom& c)
   bool on_line = false;
 
   assert(frac == false);
-  v1 = mic_cart(b, a);
-  v2 = mic_cart(c, a);
+
+  v1 = mic_cart(a, b);
+  v2 = mic_cart(a, c);
   cp = v1.cross(v2);
   dp = v1.dot(v2);
-  // std::cout << "cp: " << cp.norm() << " dp: " << dp << " |v1|^2: " << v1.squaredNorm() << std::endl;
   // Should really check also whether c(i) < b(i) and c(i) > a(i)
   if (cp.norm() < small){
     if (dp > 0.0){

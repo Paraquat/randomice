@@ -2,8 +2,8 @@ include Makefile.inc
 .DEFAULT_GOAL = randomice
 PROG = randomice
 
-LIBS = -lboost_program_options
-CCFLGS = 
+LIBS = -lboost_program_options -lgsl
+CCFLAGS = 
 LDFLAGS = 
 HEADERS = atom.h water.h hbond.h cell.h ice.h randomice.h constants.h
 SRCS = atom.cc water.cc hbond.cc cell.cc ice.cc randomice.cc

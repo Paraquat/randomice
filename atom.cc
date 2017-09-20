@@ -38,6 +38,7 @@ Atom::Atom(std::string symbol, int i, Eigen::Vector3d v, bool occ)
 
 Atom::Atom(const Atom& a)
 {
+  // std::cout << "copy constructor invoked" << std::endl;
   name = a.name;
   label = a.label;
   r = a.r;
@@ -53,6 +54,7 @@ bool Atom::operator== (const Atom& a)
 
 Atom& Atom::operator= (const Atom& a)
 {
+  // std::cout << "operator= invoked" << std::endl;
   if (this == &a) return *this;
   name = a.name;
   label = a.label;
@@ -71,7 +73,8 @@ std::ostream& operator<< (std::ostream& os, Atom& a)
       << std::left << std::setw(4) << oss.str() \
       << std::right << std::setw(20) << a.r[0] \
       << std::right << std::setw(20) << a.r[1] \
-      << std::right << std::setw(20) << a.r[2];
+      << std::right << std::setw(20) << a.r[2] \
+      << std::right << std::setw(8) << a.occupied;
   return os;
 }
 
@@ -86,6 +89,11 @@ std::ofstream& operator<< (std::ofstream& ofs, Atom& a)
       << std::right << std::setw(20) << a.r[1] \
       << std::right << std::setw(20) << a.r[2];
   return ofs;
+}
+
+void Atom::occupy(bool occ)
+{
+  occupied = occ;
 }
 
 void Atom::add_nn(atom_ptr n)

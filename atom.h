@@ -29,6 +29,7 @@ class Atom {
     friend std::ofstream& operator<< (std::ofstream&, Atom&);
     bool operator== (const Atom&);
 
+    void occupy(bool);
     void add_nn(atom_ptr);
     void print_nn(void);
 };
