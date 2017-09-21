@@ -48,6 +48,12 @@ Cell& Cell::operator= (const Cell& cell)
   return *this;
 }
 
+// Atom getter
+Atom& Cell::get_atom(int ia)
+{
+  return atoms.at(ia);
+}
+
 // Write to ostream
 std::ostream& operator<< (std::ostream& os, Cell& cell)
 {

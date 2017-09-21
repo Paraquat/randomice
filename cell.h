@@ -18,6 +18,7 @@ class Cell {
     void cart2frac_all(void);
     Eigen::Vector3d mic_cart(Atom&, Atom&);
     Eigen::Vector3d mic_frac(Atom&, Atom&);
+    Atom& get_atom(int);
     void get_dt(void);
     void get_nn(double);
     bool isPointOnLine(Atom&, Atom&, Atom&);

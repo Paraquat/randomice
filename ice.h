@@ -19,7 +19,6 @@ class Ice: public Cell {
     void add_water(Water&);
     void add_hbond(Hbond&);
     void get_waters(void);
-    void get_water_nn(double);
     void get_hbonds(void);
     void print_ice(void);
 
@@ -27,8 +26,12 @@ class Ice: public Cell {
     int rng_int(int);
     double rng_uniform(void);
     void populate_h_random(void);
+    int water_coord(int);
     int o_two_coordinated(void);
+    void swap_h(int);
     void buch_mc_correct(void);
 
     void write_cell(std::string);
+    void print_water(int);
+    void print_hbond(int);
 };

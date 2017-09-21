@@ -28,15 +28,6 @@ void Ice::get_h_pos(void)
   std::deque<Atom> hlist;
 
   if (frac == true) frac2cart_all();
-  // get_nn(oo_max);
-  // for (int i=0; i<natoms; i++){
-  //   for (int j=0; j<atoms[i].nn.size(); j++){
-  //     oo = mic_cart(atoms[i], *atoms[i].nn[j]);
-  //     r_h = atoms[i].r + oh_default*oo.normalized();
-  //     Atom a = Atom(species, natoms+1, r_h, occ);
-  //     add_atom(a);
-  //   }
-  // }
 
   get_dt();
   for (int i=0; i<natoms; i++){
@@ -72,74 +63,28 @@ void Ice::add_hbond(Hbond& h)
 
 void Ice::get_waters(void)
 {
-  std::cout << "Finding water molecules" << std::endl;
-  nwater = 0;
-  get_nn(oh_max);
+  get_dt();
   for (int i=0; i<natoms; i++){
     if (atoms[i].name == "O"){
-      assert(atoms[i].nn.size() == 4);
-      Atom::atom_ptr o = std::make_shared<Atom>(atoms[i]);
-      Atom::atom_ptr h1 = std::make_shared<Atom>(*atoms[i].nn[0]);
-      Atom::atom_ptr h2 = std::make_shared<Atom>(*atoms[i].nn[1]);
-      Atom::atom_ptr h3 = std::make_shared<Atom>(*atoms[i].nn[2]);
-      Atom::atom_ptr h4 = std::make_shared<Atom>(*atoms[i].nn[3]);
-      // Atom::atom_ptr o(new Atom(atoms[i]));
-      // Atom::atom_ptr h1(new Atom(*atoms[i].nn[0]));
-      // Atom::atom_ptr h2(new Atom(*atoms[i].nn[1]));
-      // Atom::atom_ptr h3(new Atom(*atoms[i].nn[2]));
-      // Atom::atom_ptr h4(new Atom(*atoms[i].nn[3]));
-
-      Water w(o->label, o, h1, h2, h3, h4);
-      add_water(w);
-      // std::cout << waters.back() << std::endl;
-    }
-  }
-
-  // get_dt();
-  // for (int i=0; i<natoms; i++){
-  //   if (atoms[i].name == "O"){
-  //     Atom::atom_ptr o = std::make_shared<Atom>(atoms[i]);
-  //     Atom::atom_ptr h1, h2, h3, h4;
-  //     int hcount = 0;
-  //     for (int j=0; j<natoms; j++){
-  //       if (dt(i,j) < oh_max){
-  //         if (atoms[j].name == "H"){
-  //           hcount++;
-  //           if (hcount == 1){
-  //             h1 = std::make_shared<Atom>(atoms[j]);
-  //           } else if (hcount == 2){
-  //             h2 = std::make_shared<Atom>(atoms[j]);
-  //           } else if (hcount == 3){
-  //             h3 = std::make_shared<Atom>(atoms[j]);
-  //           } else if (hcount == 4){
-  //             h4 = std::make_shared<Atom>(atoms[j]);
-  //           }
-  //         }
-  //       } 
-  //     }
-  //     if (hcount != 4){
-  //       throw std::runtime_error("Did not find 4 hydrogens for this water");
-  //     }
-  //     Water w(o->label, o, h1, h2, h3, h4);
-  //     add_water(w);
-  //   }
-  // }
-}
-
-void Ice::get_water_nn(double cutoff)
-{
-  Eigen::Vector3d d;
-
-  assert(frac == false);
-  for (int i=0; i<nwater; i++){
-    for (int j=0; j<nwater; j++){
-      if (i != j){
-        d = mic_cart(*waters[i].O, *waters[j].O);
-        if (d.norm() < cutoff){
-          Water::water_ptr ptr(new Water(waters[j]));
-          waters[i].add_nn(ptr);
-        }
+      int io = i;
+      int ih1, ih2, ih3, ih4;
+      int hcount = 0;
+      for (int j=0; j<natoms; j++){
+        if (dt(i,j) < oh_max){
+          if (atoms[j].name == "H"){
+            hcount++;
+            if (hcount == 1) ih1 = j;
+            else if (hcount == 2) ih2 = j;
+            else if (hcount == 3) ih3 = j;
+            else if (hcount == 4) ih4 = j;
+          }
+        } 
       }
+      if (hcount != 4){
+        throw std::runtime_error("Did not find 4 hydrogens for this water");
+      }
+      Water w(io, ih1, ih2, ih3, ih4);
+      add_water(w);
     }
   }
 }
@@ -147,22 +92,83 @@ void Ice::get_water_nn(double cutoff)
 void Ice::get_hbonds(void)
 {
   std::cout << "Finding hydrogen bonds" << std::endl;
-  // bool done, adjacent;
   bool done;
 
   nhbond = 0;
   get_dt();
 
+  for (int i=0; i<nwater; i++){
+    int io1 = waters[i].O;
+    for (int j=i+1; j<nwater; j++){
+      int io2 = waters[j].O;
+      if (dt(io1,io2) < oo_max){
+        int ih1, ih2;
+
+        std::set<int> ws;
+        ws.insert(i);
+        ws.insert(j);
+
+        done = false;
+        for (int k=0; k<hbonds.size(); k++){
+          if (ws == hbonds[k].w){
+            done = true;
+            break;
+          }
+        }
+        if (done) continue;
+
+        int nh = 0;
+        if (isPointOnLine(atoms[io1], atoms[io2], atoms[waters[i].H1])){
+          nh++; 
+          ih1 = waters[i].H1;
+        }
+        if (isPointOnLine(atoms[io1], atoms[io2], atoms[waters[i].H2])){
+          nh++; 
+          ih1 = waters[i].H2;
+        }
+        if (isPointOnLine(atoms[io1], atoms[io2], atoms[waters[i].H3])){
+          nh++; 
+          ih1 = waters[i].H3;
+        }
+        if (isPointOnLine(atoms[io1], atoms[io2], atoms[waters[i].H4])){
+          nh++; 
+          ih1 = waters[i].H4;
+        }
+        if (isPointOnLine(atoms[io1], atoms[io2], atoms[waters[j].H1])){
+          nh++; 
+          ih2 = waters[j].H1;
+        }
+        if (isPointOnLine(atoms[io1], atoms[io2], atoms[waters[j].H2])){
+          nh++; 
+          ih2 = waters[j].H2;
+        }
+        if (isPointOnLine(atoms[io1], atoms[io2], atoms[waters[j].H3])){
+          nh++; 
+          ih2 = waters[j].H3;
+        }
+        if (isPointOnLine(atoms[io1], atoms[io2], atoms[waters[j].H4])){
+          nh++; 
+          ih2 = waters[j].H4;
+        }
+        assert(nh == 2);
+        Hbond hb(io1, io2, ih1, ih2, i, j);
+        add_hbond(hb);
+
+      }
+    }
+  }
+
   // for (int i=0; i<natoms; i++){
   //   if (atoms[i].name == "O"){
-  //     Atom::atom_ptr o1 = std::make_shared<Atom>(atoms[i]);
+  //     int io1 = atoms[i].label;
   //     for (int j=i+1; j<natoms; j++){
   //       if ((atoms[j].name == "O") && (dt(i,j) < oo_max)){
-  //         Atom::atom_ptr o2 = std::make_shared<Atom>(atoms[j]);
+  //         int io2 = atoms[j].label;
+  //         int ih1, ih2;
 
   //         std::set<int> ws;
-  //         ws.insert(atoms[i].label);
-  //         ws.insert(atoms[j].label);
+  //         ws.insert(get_atom(i).label);
+  //         ws.insert(get_atom(j).label);
 
   //         done = false;
   //         for (int k=0; k<hbonds.size(); k++){
@@ -173,7 +179,6 @@ void Ice::get_hbonds(void)
   //         }
 
   //         if (done) continue;
-  //         // Atom::atom_ptr h1, h2;
   //         int nh = 0; 
   //         for (int k=0; k<natoms; k++){
   //           if (dt(i,k) < oh_max) adjacent = true;
@@ -184,102 +189,29 @@ void Ice::get_hbonds(void)
   //           if (atoms[k].name == "H"){
   //             if (isPointOnLine(atoms[i], atoms[j], atoms[k])){
   //               nh++;
-  //               if (nh == 1){
-  //                 h1_ind = k;
-  //                 // h1.reset(new Atom(atoms[k]));
-  //                 // h1 = std::make_shared<Atom>(atoms[k]);
-  //               } else if (nh == 2){
-  //                 h2_ind = k;
-  //                 // h2.reset(new Atom(atoms[k]));
-  //                 // h2 = std::make_shared<Atom>(atoms[k]);
-  //               }
+  //               if (nh == 1) ih1 = k;
+  //               else if (nh == 2) ih2 = k;
   //             }
   //           }
   //         } 
   //         assert(nh == 2);
-  //         Atom::atom_ptr h1(new Atom(atoms[h1_ind]));
-  //         Atom::atom_ptr h2(new Atom(atoms[h2_ind]));
-  //         // Atom::atom_ptr h2 = std::make_shared<Atom>(atoms[h2_ind]);
-  //         Hbond hb(o1, o2, h1, h2);
+  //         Hbond hb(io1, io2, ih1, ih2);
   //         add_hbond(hb);
   //       }
   //     }
   //   }
   // }
-
-  get_nn(oo_max);
-  for (int i=0; i<nwater; i++){
-    // water_ptr w1(new Water(waters[i]));
-    water_ptr w1 = std::make_shared<Water>(waters[i]);
-    assert(waters[i].nn.size() == 4);
-    for (int j=0; j<4; j++){
-      // water_ptr w2(new Water(*waters[i].nn[j]));
-      water_ptr w2 = std::make_shared<Water>(*waters[i].nn[j]);
-
-      // check whether this hbond is already in the list
-      std::set<int> ws;
-      ws.insert(w1->label);
-      ws.insert(w2->label);
-
-      done = false;
-      for (int k=0; k<hbonds.size(); k++){
-        if (ws == hbonds[k].w){
-          done = true;
-          break;
-        }
-      }
-      if (done) continue;
-
-      Atom::atom_ptr h1, h2;
-      if (isPointOnLine(*w1->O, *w2->O, *w1->H1)){
-        h1 = w1->H1;
-      }
-      else if (isPointOnLine(*w1->O, *w2->O, *w1->H2)){
-        h1 = w1->H2;
-      }
-      else if (isPointOnLine(*w1->O, *w2->O, *w1->H3)){
-        h1 = w1->H3;
-      }
-      else if (isPointOnLine(*w1->O, *w2->O, *w1->H4)){
-        h1 = w1->H4;
-      }
-      else std::cout << "Failed to find h1 for water " << w1->label 
-                     << std::endl;
-
-      if (isPointOnLine(*w1->O, *w2->O, *w2->H1)){
-        h2 = w2->H1;
-      }
-      else if (isPointOnLine(*w1->O, *w2->O, *w2->H2)){
-        h2 = w2->H2;
-      }
-      else if (isPointOnLine(*w1->O, *w2->O, *w2->H3)){
-        h2 = w2->H3;
-      }
-      else if (isPointOnLine(*w1->O, *w2->O, *w2->H4)){
-        h2 = w2->H4;
-      }
-      else std::cout << "Failed to find h2 for water " << w2->label 
-                     << std::endl;
-
-      Hbond hb((*w1).O, (*w2).O , h1, h2, w1, w2);
-
-      add_hbond(hb);
-      hbond_ptr hbp = std::make_shared<Hbond>(hbonds.back());
-      w1->add_hbond(hbp);
-      w2->add_hbond(hbp);
-    }
-  }
 }
 
 void Ice::print_ice(void)
 {
   std::cout << nwater << " water molecules" << std::endl << std::endl;
   for (int i=0; i<nwater; i++){
-    std::cout << *waters[i].O << std::endl;
-    std::cout << *waters[i].H1 << std::endl;
-    std::cout << *waters[i].H2 << std::endl;
-    std::cout << *waters[i].H3 << std::endl;
-    std::cout << *waters[i].H4 << std::endl;
+    std::cout << get_atom(waters[i].O) << std::endl;
+    std::cout << get_atom(waters[i].H1) << std::endl;
+    std::cout << get_atom(waters[i].H2) << std::endl;
+    std::cout << get_atom(waters[i].H3) << std::endl;
+    std::cout << get_atom(waters[i].H4) << std::endl;
     std::cout << std::endl;
   }
 }
@@ -309,9 +241,25 @@ void Ice::populate_h_random(void)
   init_rng();
   for (int i=0; i<nhbond; i++){
     rn = rng_int(2);
-    if (rn == 0) hbonds[i].H1->occupy(true);
-    else hbonds[i].H2->occupy(true);
+    if (rn == 0) {
+      atoms[hbonds[i].H1].occupy(true);
+      atoms[hbonds[i].H2].occupy(false);
+    } else{
+      atoms[hbonds[i].H1].occupy(false);
+      atoms[hbonds[i].H2].occupy(true);
+    }
   }
+}
+
+// Check the H coordination number of an oxygen
+int Ice::water_coord(int w)
+{
+  int nH = 0;
+  if (get_atom(waters[w].H1).occupied) nH++;
+  if (get_atom(waters[w].H2).occupied) nH++;
+  if (get_atom(waters[w].H3).occupied) nH++;
+  if (get_atom(waters[w].H4).occupied) nH++;
+  return nH;
 }
 
 // count the number of two-coordinated oxygens
@@ -319,11 +267,18 @@ int Ice::o_two_coordinated(void)
 {
   int ntwocoord = 0;
   for (int i=0; i<nwater; i++){
-    if (waters[i].coord() == 2){
+    if (water_coord(i) == 2){
       ntwocoord++;
     }
   }
   return ntwocoord;
+}
+
+// Swap the H position on a hydrogen bond
+void Ice::swap_h(int hb)
+{
+  atoms[hbonds[hb].H1].occupied = !atoms[hbonds[hb].H1].occupied;
+  atoms[hbonds[hb].H2].occupied = !atoms[hbonds[hb].H2].occupied;
 }
 
 // Monte Carlo algorithm to correct ice rules (Buch et al JCP B 102:8641, 1998)
@@ -334,22 +289,23 @@ void Ice::buch_mc_correct(void)
 
   init_rng();
   while (o_two_coordinated() != nwater){
+    std::cout << o_two_coordinated() << std::endl;
     // Pick a random h-bond
     int hb_ind = rng_int(nhbond);
     // before the h swap
-    c1a = hbonds[hb_ind].W1->coord();
-    c2a = hbonds[hb_ind].W2->coord();
+    c1a = water_coord(hbonds[hb_ind].W1);
+    c2a = water_coord(hbonds[hb_ind].W2);
     cdiffa = std::abs(c1a - c2a);
     // after the h swap
-    hbonds[hb_ind].swap_h();
-    c1b = hbonds[hb_ind].W1->coord();
-    c2b = hbonds[hb_ind].W2->coord();
+    swap_h(hb_ind);
+    c1b = water_coord(hbonds[hb_ind].W1);
+    c2b = water_coord(hbonds[hb_ind].W2);
     cdiffb = std::abs(c1b - c2b);
     //No change in the difference
     if (cdiffb - cdiffa == 0){
       // move with probability 1/2
       double rn = rng_uniform();
-      if (rn < 0.5) hbonds[hb_ind].swap_h();
+      if (rn < 0.5) swap_h(hb_ind);
     // Decrease in the coordination difference after move
     } else if (cdiffb - cdiffa < 0){
       // accept move
@@ -357,11 +313,10 @@ void Ice::buch_mc_correct(void)
     // Increase in the coordination difference after move
     } else if (cdiffb - cdiffa > 0){
       // reject move
-      hbonds[hb_ind].swap_h();
+      swap_h(hb_ind);
     }
   }
 }
-
 
 // Write object to a .cell file
 void Ice::write_cell(std::string fname)
@@ -382,11 +337,38 @@ void Ice::write_cell(std::string fname)
   else outfile << "%BLOCK positions_abs" << std::endl;
 
   for (int i=0; i<nwater; i++) {
-    if (atoms[i].occupied){
-      outfile << waters[i];
+    outfile << get_atom(waters[i].O) << std::endl;
+    if (atoms[waters[i].H1].occupied){
+      outfile << get_atom(waters[i].H1) << std::endl;
+    }
+    if (atoms[waters[i].H2].occupied){
+      outfile << get_atom(waters[i].H2) << std::endl;
+    }
+    if (atoms[waters[i].H3].occupied){
+      outfile << get_atom(waters[i].H3) << std::endl;
+    }
+    if (atoms[waters[i].H4].occupied){
+      outfile << get_atom(waters[i].H4) << std::endl;
     }
   }
 
   if (frac) outfile << "%ENDBLOCK positions_frac" << std::endl << std::endl;
   else outfile << "%ENDBLOCK positions_abs" << std::endl << std::endl;
+}
+
+void Ice::print_water(int w)
+{
+  std::cout << get_atom(waters[w].O) << std::endl
+            << get_atom(waters[w].H1) << std::endl
+            << get_atom(waters[w].H2) << std::endl
+            << get_atom(waters[w].H3) << std::endl
+            << get_atom(waters[w].H4) << std::endl << std::endl;
+}
+
+void Ice::print_hbond(int hb)
+{
+  std::cout << get_atom(hbonds[hb].O1) << std::endl
+            << get_atom(hbonds[hb].O2) << std::endl
+            << get_atom(hbonds[hb].H1) << std::endl
+            << get_atom(hbonds[hb].H2) << std::endl << std::endl;
 }

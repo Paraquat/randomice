@@ -47,22 +47,11 @@ int main(int argc, char* argv[]){
   Ice ice(sc);
   ice.get_h_pos();
   ice.get_waters();
-  ice.get_water_nn(oo_max);
   ice.get_hbonds();
   std::cout << ice.nwater << " waters" << std::endl;
   std::cout << ice.nhbond << " hydrogen bonds" << std::endl;
   ice.populate_h_random();
   ice.buch_mc_correct();
-  for (int i=0; i<ice.nwater; i++){
-    std::cout << ice.waters[i].hbonds.size() << std::endl;
-    for (int j=0; j<ice.waters[i].hbonds.size(); j++){
-      std::cout << *(ice.waters[i].hbonds[j]);
-    }
-    std::cout << std::endl;
-  }
-  // for (int i=0; i<ice.nhbond; i++){
-  //   std::cout << ice.hbonds[i] << std::endl;
-  // }
 
   ice.write_cell("test.cell");
 
