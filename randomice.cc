@@ -48,10 +48,13 @@ int main(int argc, char* argv[]){
   ice.get_h_pos();
   ice.get_waters();
   ice.get_hbonds();
+
   std::cout << ice.nwater << " waters" << std::endl;
   std::cout << ice.nhbond << " hydrogen bonds" << std::endl;
   ice.populate_h_random();
   ice.buch_mc_correct();
+  ice.print_network();
+  ice.rick_algo();
 
   ice.write_cell("test.cell");
 

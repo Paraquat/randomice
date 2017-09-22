@@ -4,6 +4,7 @@
 #include <sstream>
 #include <Eigen/Core>
 #include <deque>
+#include <memory>
 
 #ifndef ATOM_H
 #define ATOM_H

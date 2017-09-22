@@ -1,6 +1,8 @@
 #include "cell.h"
 #include "water.h"
 #include "hbond.h"
+#include <tuple>
+#include <vector>
 #include <gsl/gsl_rng.h>
 
 class Ice: public Cell {
@@ -30,8 +32,15 @@ class Ice: public Cell {
     int o_two_coordinated(void);
     void swap_h(int);
     void buch_mc_correct(void);
+    int hb_target(int);
+
+    typedef std::tuple<int,int> i2ple;
+    std::vector<bool> save_config(void);
+    std::vector<i2ple> get_loop(void);
+    void rick_algo(void);
 
     void write_cell(std::string);
     void print_water(int);
     void print_hbond(int);
+    void print_network(void);
 };

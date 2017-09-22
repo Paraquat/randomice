@@ -9,9 +9,8 @@ class Water {
   private:
   protected:
   public:
-    int O, H1, H2, H3, H4;
+    int O, H1, H2, H3, H4, target;
     std::string ionic;
-    std::deque<int> nn;
     std::deque<int> hbonds;
 
     Water();
@@ -21,7 +20,6 @@ class Water {
     bool operator== (const Water&);
     Water(int, int, int, int, int);
 
-    void add_nn(int);
     void add_hbond(int);
 };
 

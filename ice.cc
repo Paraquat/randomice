@@ -158,49 +158,15 @@ void Ice::get_hbonds(void)
     }
   }
 
-  // for (int i=0; i<natoms; i++){
-  //   if (atoms[i].name == "O"){
-  //     int io1 = atoms[i].label;
-  //     for (int j=i+1; j<natoms; j++){
-  //       if ((atoms[j].name == "O") && (dt(i,j) < oo_max)){
-  //         int io2 = atoms[j].label;
-  //         int ih1, ih2;
-
-  //         std::set<int> ws;
-  //         ws.insert(get_atom(i).label);
-  //         ws.insert(get_atom(j).label);
-
-  //         done = false;
-  //         for (int k=0; k<hbonds.size(); k++){
-  //           if (ws == hbonds[k].w){
-  //             done = true;
-  //             break;
-  //           }
-  //         }
-
-  //         if (done) continue;
-  //         int nh = 0; 
-  //         for (int k=0; k<natoms; k++){
-  //           if (dt(i,k) < oh_max) adjacent = true;
-  //           else if (dt(j,k) < oh_max) adjacent = true;
-  //           else adjacent = false;
-  //           if (adjacent == false) continue;
-
-  //           if (atoms[k].name == "H"){
-  //             if (isPointOnLine(atoms[i], atoms[j], atoms[k])){
-  //               nh++;
-  //               if (nh == 1) ih1 = k;
-  //               else if (nh == 2) ih2 = k;
-  //             }
-  //           }
-  //         } 
-  //         assert(nh == 2);
-  //         Hbond hb(io1, io2, ih1, ih2);
-  //         add_hbond(hb);
-  //       }
-  //     }
-  //   }
-  // }
+  for (int i=0; i<nhbond; i++){
+    int io1 = hbonds[i].O1;
+    int io2 = hbonds[i].O2;
+    for (int j=0; j<nwater; j++){
+      if (waters[j].O == io1) waters[j].add_hbond(i);
+      else if (waters[j].O == io2) waters[j].add_hbond(i);
+    }
+  }
+  for (int i=0; i<nwater; i++) assert(waters[i].hbonds.size() == 4);
 }
 
 void Ice::print_ice(void)
@@ -289,7 +255,6 @@ void Ice::buch_mc_correct(void)
 
   init_rng();
   while (o_two_coordinated() != nwater){
-    std::cout << o_two_coordinated() << std::endl;
     // Pick a random h-bond
     int hb_ind = rng_int(nhbond);
     // before the h swap
@@ -318,10 +283,93 @@ void Ice::buch_mc_correct(void)
   }
 }
 
+// Return the direction of a hydrogen bond. If it is contains a Bjerrum
+// defect, return -1.
+int Ice::hb_target(int hb)
+{
+  int target;
+  if (get_atom(hbonds[hb].H1).occupied && get_atom(hbonds[hb].H2).occupied){
+    target = -1;
+  } 
+  if (get_atom(hbonds[hb].H1).occupied) target = hbonds[hb].W2;
+  else if (get_atom(hbonds[hb].H2).occupied) target = hbonds[hb].W1;
+  else target = -1;
+  if (target == -1){
+    throw std::runtime_error("Bjerrum defect");
+  } else return target;
+}
+
+// Save the configuration in case of reset after Monte Carlo move
+std::vector<bool> Ice::save_config(void)
+{
+  std::vector<bool> conf;
+  for (int i=0; i<natoms; i++) conf.push_back(atoms[i].occupied);
+  return conf;
+}
+
+// Find a closed loop of hydrogen bonds (in direction of donation). May cross
+// cell boundary and end in a image
+std::vector<Ice::i2ple> Ice::get_loop(void)
+{
+  int max_steps = 1000;
+  std::vector<i2ple> loop;
+  int w, hb, target;
+  bool end;
+
+  // Pick a random starting point and a random donor hbond
+  init_rng();
+  w = rng_int(nwater);
+  while (true){
+    hb = rng_int(4);
+    target = hb_target(waters[w].hbonds[hb]);
+    if (target != w) break;
+  }
+  i2ple step(w, hb);
+  loop.push_back(step);
+
+  for (int i=0; i<max_steps; i++){
+    end = false;
+    w = hb_target(std::get<1>(loop.back()));
+    // Pick a hbond at random
+    hb = rng_int(4);
+    target = hb_target(waters[w].hbonds[hb]);
+    if (target == w) continue; // if the bond is a donor to this water
+    else {
+      for (int j=0; j<loop.size(); j++){
+        if (target == std::get<0>(loop[j])){
+          end = true;
+          break;
+        }
+      }
+    }
+
+    if (end) break;
+    else {
+      i2ple step(target, hb);
+      loop.push_back(step);
+    std::cout << w << ": " << hbonds[waters[w].hbonds[hb]].W1 << " " << hbonds[waters[w].hbonds[hb]].W2 << " -> " << target << std::endl;
+    std::cout << std::get<0>(step) << " " << std::get<1>(step) << std::endl;
+    }
+  }
+  return loop;
+}
+
+// Randomise ice lattice using rick algorithm
+void Ice::rick_algo(void)
+{
+  std::vector<i2ple> loop;
+
+  loop = get_loop();
+  // for (int i=0; i<loop.size(); i++){
+  //   std::cout << std::get<0>(loop[i]) << " " << std::get<1>(loop[i]) << std::endl;
+  // }
+  // std::cout << std::endl;
+}
+
 // Write object to a .cell file
 void Ice::write_cell(std::string fname)
 {
-  std::ofstream     outfile(fname.c_str());
+  std::ofstream outfile(fname.c_str());
 
   if (outfile.fail()) {
     std::cout << "Error opening file " << fname << std::endl;
@@ -371,4 +419,15 @@ void Ice::print_hbond(int hb)
             << get_atom(hbonds[hb].O2) << std::endl
             << get_atom(hbonds[hb].H1) << std::endl
             << get_atom(hbonds[hb].H2) << std::endl << std::endl;
+}
+
+void Ice::print_network(void)
+{
+  for (int i=0; i<nwater; i++){
+    std::cout << waters[i].O << ": ";
+    for (int j=0; j<waters[i].hbonds.size(); j++){
+      std::cout << std::setw(6) << hb_target(waters[i].hbonds[j]) << " ";
+    }
+    std::cout << std::endl;
+  }
 }

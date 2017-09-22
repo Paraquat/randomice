@@ -43,11 +43,6 @@ Water::Water(int o, int h1, int h2, int h3, int h4)
   H4 = h4;
 }
 
-void Water::add_nn(int n)
-{
-  nn.push_back(n);
-}
-
 void Water::add_hbond(int hb)
 {
   hbonds.push_back(hb);
