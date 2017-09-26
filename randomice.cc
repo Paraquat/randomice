@@ -53,10 +53,10 @@ int main(int argc, char* argv[]){
   std::cout << ice.nhbond << " hydrogen bonds" << std::endl;
   ice.populate_h_random();
   ice.buch_mc_correct();
+  ice.write_cell("iceIh.cell");
   ice.print_network();
   ice.rick_algo();
 
-  ice.write_cell("test.cell");
 
   return 0;
 }

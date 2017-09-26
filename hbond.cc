@@ -32,6 +32,12 @@ Hbond& Hbond::operator= (const Hbond& h)
   return *this;
 }
 
+bool Hbond::operator== (const Hbond& h)
+{
+  if (w == h.w) return true;
+  else return false;
+}
+
 Hbond::Hbond(int o1, int o2, int h1, int h2, int w1, int w2)
 {
   O1 = o1;

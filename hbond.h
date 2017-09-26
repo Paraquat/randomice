@@ -19,6 +19,7 @@ class Hbond {
     Hbond(const Hbond&);
 
     Hbond& operator= (const Hbond&);
+    bool operator== (const Hbond&);
     Hbond(int, int, int, int, int, int);
 };
 

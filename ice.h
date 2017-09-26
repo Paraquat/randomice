@@ -5,6 +5,22 @@
 #include <vector>
 #include <gsl/gsl_rng.h>
 
+struct Node {
+    int water;
+    int hbond;
+
+    Node(){};
+    virtual ~Node(){}; 
+    Node(int w, int h){
+        water = w;
+        hbond = h;
+    }
+    Node(const Node& n){
+        water = n.water;
+        hbond = n.hbond;
+    }
+};
+
 class Ice: public Cell {
   private:
     gsl_rng *r;
@@ -34,12 +50,13 @@ class Ice: public Cell {
     void buch_mc_correct(void);
     int hb_target(int);
 
-    typedef std::tuple<int,int> i2ple;
     std::vector<bool> save_config(void);
-    std::vector<i2ple> get_loop(void);
+    std::deque<Node> get_loop(void);
     void rick_algo(void);
 
     void write_cell(std::string);
+    void write_chunk_cell(std::string, std::deque<int>);
+    void write_highlight_cell(std::string, std::deque<int>);
     void print_water(int);
     void print_hbond(int);
     void print_network(void);

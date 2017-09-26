@@ -309,47 +309,43 @@ std::vector<bool> Ice::save_config(void)
 
 // Find a closed loop of hydrogen bonds (in direction of donation). May cross
 // cell boundary and end in a image
-std::vector<Ice::i2ple> Ice::get_loop(void)
+std::deque<Node> Ice::get_loop(void)
 {
-  int max_steps = 1000;
-  std::vector<i2ple> loop;
-  int w, hb, target;
+  std::deque<Node> loop;
+  int current, hb, target;
   bool end;
 
-  // Pick a random starting point and a random donor hbond
   init_rng();
-  w = rng_int(nwater);
+  current = rng_int(nwater);
   while (true){
     hb = rng_int(4);
-    target = hb_target(waters[w].hbonds[hb]);
-    if (target != w) break;
+    target = hb_target(waters[current].hbonds[hb]);
+    if (target != current) break;
   }
-  i2ple step(w, hb);
-  loop.push_back(step);
+  loop.push_back(Node(current, waters[current].hbonds[hb]));
 
-  for (int i=0; i<max_steps; i++){
+  while (true){
     end = false;
-    w = hb_target(std::get<1>(loop.back()));
-    // Pick a hbond at random
-    hb = rng_int(4);
-    target = hb_target(waters[w].hbonds[hb]);
-    if (target == w) continue; // if the bond is a donor to this water
-    else {
-      for (int j=0; j<loop.size(); j++){
-        if (target == std::get<0>(loop[j])){
-          end = true;
-          break;
-        }
+    while (true){
+      hb = rng_int(4);
+      target = hb_target(waters[current].hbonds[hb]);
+      if (target != current) break;
+    }
+    for (int j=0; j<loop.size(); j++){
+      if (target == loop[j].water){
+        end = true;
+        break;
       }
     }
-
+    std::cout << current << ": " << hbonds[waters[current].hbonds[hb]].W1 << " " << hbonds[waters[current].hbonds[hb]].W2 << " -> " << target << std::endl;
+    loop.push_back(Node(current, waters[current].hbonds[hb]));
+    current = target;
     if (end) break;
-    else {
-      i2ple step(target, hb);
-      loop.push_back(step);
-    std::cout << w << ": " << hbonds[waters[w].hbonds[hb]].W1 << " " << hbonds[waters[w].hbonds[hb]].W2 << " -> " << target << std::endl;
-    std::cout << std::get<0>(step) << " " << std::get<1>(step) << std::endl;
-    }
+  }
+  // Trim the vector to get just the loop part
+  while (true){
+    if (loop[0].water == target) break;
+    else loop.pop_front();
   }
   return loop;
 }
@@ -357,13 +353,19 @@ std::vector<Ice::i2ple> Ice::get_loop(void)
 // Randomise ice lattice using rick algorithm
 void Ice::rick_algo(void)
 {
-  std::vector<i2ple> loop;
-
+  std::deque<Node> loop;
+  std::deque<int> loop2;
   loop = get_loop();
-  // for (int i=0; i<loop.size(); i++){
-  //   std::cout << std::get<0>(loop[i]) << " " << std::get<1>(loop[i]) << std::endl;
-  // }
-  // std::cout << std::endl;
+  for (int i=0; i<loop.size(); i++){
+    loop2.push_back(loop[i].water);
+  }
+
+  write_highlight_cell("test1.cell", loop2);
+  for (int i=0; i<loop.size(); i++){
+    swap_h(loop[i].hbond);
+    std::cout << loop[i].hbond << " ";
+  }
+  write_highlight_cell("test2.cell", loop2);
 }
 
 // Write object to a .cell file
@@ -386,6 +388,94 @@ void Ice::write_cell(std::string fname)
 
   for (int i=0; i<nwater; i++) {
     outfile << get_atom(waters[i].O) << std::endl;
+    if (atoms[waters[i].H1].occupied){
+      outfile << get_atom(waters[i].H1) << std::endl;
+    }
+    if (atoms[waters[i].H2].occupied){
+      outfile << get_atom(waters[i].H2) << std::endl;
+    }
+    if (atoms[waters[i].H3].occupied){
+      outfile << get_atom(waters[i].H3) << std::endl;
+    }
+    if (atoms[waters[i].H4].occupied){
+      outfile << get_atom(waters[i].H4) << std::endl;
+    }
+  }
+
+  if (frac) outfile << "%ENDBLOCK positions_frac" << std::endl << std::endl;
+  else outfile << "%ENDBLOCK positions_abs" << std::endl << std::endl;
+}
+
+// Write object to a .cell file
+void Ice::write_chunk_cell(std::string fname, std::deque<int> wlist)
+{
+  std::ofstream outfile(fname.c_str());
+
+  if (outfile.fail()) {
+    std::cout << "Error opening file " << fname << std::endl;
+  }
+
+  outfile << "%BLOCK lattice_cart" << std::endl;
+  for (int i=0; i<=2; i++) {
+    outfile << std::fixed << std::setprecision(8) \
+            << lat.row(i) << std::endl;
+  }
+  outfile << "%ENDBLOCK lattice_cart" << std::endl << std::endl;
+  if (frac) outfile << "%BLOCK positions_frac" << std::endl;
+  else outfile << "%BLOCK positions_abs" << std::endl;
+
+  for (int i=0; i<wlist.size(); i++) {
+    outfile << get_atom(waters[wlist[i]].O) << std::endl;
+    if (atoms[waters[wlist[i]].H1].occupied){
+      outfile << get_atom(waters[wlist[i]].H1) << " " << wlist[i] << std::endl;
+    }
+    if (atoms[waters[wlist[i]].H2].occupied){
+      outfile << get_atom(waters[wlist[i]].H2) << " " << wlist[i] << std::endl;
+    }
+    if (atoms[waters[wlist[i]].H3].occupied){
+      outfile << get_atom(waters[wlist[i]].H3) << " " << wlist[i] << std::endl;
+    }
+    if (atoms[waters[wlist[i]].H4].occupied){
+      outfile << get_atom(waters[wlist[i]].H4) << " " << wlist[i] << std::endl;
+    }
+  }
+
+  if (frac) outfile << "%ENDBLOCK positions_frac" << std::endl << std::endl;
+  else outfile << "%ENDBLOCK positions_abs" << std::endl << std::endl;
+}
+
+// Write object to a .cell file
+void Ice::write_highlight_cell(std::string fname, std::deque<int> wlist)
+{
+  std::ofstream outfile(fname.c_str());
+
+  if (outfile.fail()) {
+    std::cout << "Error opening file " << fname << std::endl;
+  }
+
+  outfile << "%BLOCK lattice_cart" << std::endl;
+  for (int i=0; i<=2; i++) {
+    outfile << std::fixed << std::setprecision(8) \
+            << lat.row(i) << std::endl;
+  }
+  outfile << "%ENDBLOCK lattice_cart" << std::endl << std::endl;
+  if (frac) outfile << "%BLOCK positions_frac" << std::endl;
+  else outfile << "%BLOCK positions_abs" << std::endl;
+
+  for (int i=0; i<nwater; i++) {
+    Atom o = get_atom(waters[i].O);
+    bool replace = false;
+    for (int j=0; j<wlist.size(); j++){
+      if (wlist[j] == waters[i].O) {
+        replace = true;
+      }
+    }
+    if (replace){
+      Atom temp("N", o.label, o.r, o.occupied);
+      outfile << temp << std::endl;
+    } else{
+      outfile << get_atom(waters[i].O) << std::endl;
+    }
     if (atoms[waters[i].H1].occupied){
       outfile << get_atom(waters[i].H1) << std::endl;
     }
