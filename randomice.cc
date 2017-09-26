@@ -9,6 +9,14 @@ int main(int argc, char* argv[]){
   std::vector<int> scdim;
   int scx, scy, scz;
 
+  using namespace backward;
+  StackTrace st; st.load_here(32);
+  Printer p;
+  p.object = true;
+  p.color_mode = ColorMode::always;
+  p.address = true;
+  p.print(st, stderr);
+
   desc.add_options()
     ("help,h", "Print help information")
     ("infile,i", po::value< std::string >(), "Input structure file")
@@ -53,10 +61,25 @@ int main(int argc, char* argv[]){
   std::cout << ice.nhbond << " hydrogen bonds" << std::endl;
   ice.populate_h_random();
   ice.buch_mc_correct();
+  int nionic = ice.check_ionic_defects();
+  int nbjerrum = ice.check_bjerrum_defects();
+  if (nionic != 0){
+    std::cout << "WARNING: " << nionic << " ionic defects" << std::endl;
+  }
+  if (nbjerrum != 0){
+    std::cout << "WARNING: " << nbjerrum << " Bjerrum defects" << std::endl;
+  }
+  ice.rick_randomise(1000);
+  std::cout << "Randomisation complete";
+  nionic = ice.check_ionic_defects();
+  nbjerrum = ice.check_bjerrum_defects();
+  if (nionic != 0){
+    std::cout << "WARNING: " << nionic << " ionic defects" << std::endl;
+  }
+  if (nbjerrum != 0){
+    std::cout << "WARNING: " << nbjerrum << " Bjerrum defects" << std::endl;
+  }
   ice.write_cell("iceIh.cell");
-  ice.print_network();
-  ice.rick_algo();
-
 
   return 0;
 }

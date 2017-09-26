@@ -2,7 +2,7 @@ include Makefile.inc
 .DEFAULT_GOAL = randomice
 PROG = randomice
 
-LIBS = -lboost_program_options -lgsl
+LIBS = -lboost_program_options -lgsl -lbackward
 CCFLAGS = 
 LDFLAGS = -std=c++11 -stdlib=libc++
 HEADERS = atom.h water.h hbond.h cell.h ice.h randomice.h constants.h
@@ -18,7 +18,7 @@ clean:
 	rm -f $(PROG) $(OBJS)
 
 $(PROG): $(OBJS)
-	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
+	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LPATH) $(LIBS)
 
 .cc.o:
 	$(CC) -c $< $(LDFLAGS)

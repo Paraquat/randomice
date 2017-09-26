@@ -45,14 +45,22 @@ class Ice: public Cell {
     double rng_uniform(void);
     void populate_h_random(void);
     int water_coord(int);
+    int hbond_occ(int);
     int o_two_coordinated(void);
     void swap_h(int);
     void buch_mc_correct(void);
     int hb_target(int);
 
     std::vector<bool> save_config(void);
+    void revert_config(std::vector<bool>);
     std::deque<Node> get_loop(void);
-    void rick_algo(void);
+    void rick_move(void);
+    void rick_randomise(int);
+
+    int check_ionic_defects(void);
+    int check_bjerrum_defects(void);
+    Eigen::Vector3d water_dipole(int);
+    double c1_dipole(void);
 
     void write_cell(std::string);
     void write_chunk_cell(std::string, std::deque<int>);

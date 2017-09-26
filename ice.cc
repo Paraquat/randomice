@@ -228,6 +228,15 @@ int Ice::water_coord(int w)
   return nH;
 }
 
+// Check how many hydrogens there are on a hydrogen bond
+int Ice::hbond_occ(int hb)
+{
+  int nH = 0;
+  if (get_atom(hbonds[hb].H1).occupied) nH++;
+  if (get_atom(hbonds[hb].H2).occupied) nH++;
+  return nH;
+}
+
 // count the number of two-coordinated oxygens
 int Ice::o_two_coordinated(void)
 {
@@ -307,6 +316,12 @@ std::vector<bool> Ice::save_config(void)
   return conf;
 }
 
+// Revert the configuration to saved
+void Ice::revert_config(std::vector<bool> conf)
+{
+  for (int i=0; i<natoms; i++) atoms[i].occupied = conf[i];
+}
+
 // Find a closed loop of hydrogen bonds (in direction of donation). May cross
 // cell boundary and end in a image
 std::deque<Node> Ice::get_loop(void)
@@ -337,7 +352,7 @@ std::deque<Node> Ice::get_loop(void)
         break;
       }
     }
-    std::cout << current << ": " << hbonds[waters[current].hbonds[hb]].W1 << " " << hbonds[waters[current].hbonds[hb]].W2 << " -> " << target << std::endl;
+    // std::cout << current << ": " << hbonds[waters[current].hbonds[hb]].W1 << " " << hbonds[waters[current].hbonds[hb]].W2 << " -> " << target << std::endl;
     loop.push_back(Node(current, waters[current].hbonds[hb]));
     current = target;
     if (end) break;
@@ -350,22 +365,158 @@ std::deque<Node> Ice::get_loop(void)
   return loop;
 }
 
-// Randomise ice lattice using rick algorithm
-void Ice::rick_algo(void)
+// Perform a move of the Rick algorithm (Rick/Haymet JCP  118, 9291 (2003))
+void Ice::rick_move(void)
 {
   std::deque<Node> loop;
-  std::deque<int> loop2;
   loop = get_loop();
-  for (int i=0; i<loop.size(); i++){
-    loop2.push_back(loop[i].water);
-  }
 
-  write_highlight_cell("test1.cell", loop2);
+  // write_highlight_cell("test1.cell", loop2);
   for (int i=0; i<loop.size(); i++){
     swap_h(loop[i].hbond);
-    std::cout << loop[i].hbond << " ";
   }
-  write_highlight_cell("test2.cell", loop2);
+  // write_highlight_cell("test2.cell", loop2);
+}
+
+// Randomise water orientations using Rick algorithm with C1 dipole contraint
+void Ice::rick_randomise(int max_loops)
+{
+  std::cout << "Randomising water orientations via Rick algorithm..." 
+            << std::endl;
+  int ndefect;
+  double cell_dipole, cell_dipole_old, rn, mcp;
+  std::vector<bool> conf;
+
+  init_rng();
+
+  cell_dipole_old = c1_dipole();
+  conf = save_config();
+  for (int i=0; i<max_loops; i++){
+    while (true){
+      while (true){
+        rick_move(); 
+        ndefect = check_ionic_defects();
+        if (ndefect == 0) break;
+        else revert_config(conf);
+      }
+      // Monte Carlo criterion
+      cell_dipole = c1_dipole();
+      if (cell_dipole > cell_dipole_old){
+        mcp = exp(cell_dipole_old - cell_dipole);
+        rn = rng_uniform();
+        if (rn > mcp) revert_config(conf);
+      }
+      else break;
+    }
+    conf = save_config();
+    std::cout << "Cell dipole = " << cell_dipole_old << std::endl;
+    cell_dipole_old = cell_dipole;
+  }
+}
+
+// Count ionic defects
+int Ice::check_ionic_defects(void)
+{
+  int coord;
+  int nionic = 0;
+  for (int i=0; i<nwater; i++){
+    coord = water_coord(i);
+    switch(coord) {
+      case 0:
+        waters[i].ionic = "O2-";
+        nionic++;
+        break;
+      case 1:
+        waters[i].ionic = "OH-";
+        nionic++;
+        break;
+      case 2:
+        waters[i].ionic = "None";
+        break;
+      case 3:
+        waters[i].ionic = "H3O+";
+        nionic++;
+        break;
+      case 4:
+        waters[i].ionic = "H4O2+";
+        nionic++;
+        break;
+    }
+  }
+  return nionic;
+}
+
+// Count Bjerrum defects
+int Ice::check_bjerrum_defects(void)
+{
+  int occ;
+  int nbjerrum = 0;
+  for (int i=0; i<nhbond; i++){
+    occ = hbond_occ(i);
+    switch(occ) {
+      case 0:
+        hbonds[i].bjerrum = "L";
+        nbjerrum++;
+        break;
+      case 1:
+        hbonds[i].bjerrum = "None";
+        break;
+      case 2:
+        hbonds[i].bjerrum = "D";
+        nbjerrum++;
+        break;
+    }
+  }
+  return nbjerrum;
+}
+
+// Get the dipole vector of water w (multiply orientation vector by constant
+// 3.09 -- Batista et al JCP 109, 4546 (1998))
+Eigen::Vector3d Ice::water_dipole(int w)
+{
+  Eigen::Vector3d oh1, oh2;
+
+  int nh = 0;
+  int io = waters[w].O;
+  int ih1, ih2;
+  assert(water_coord(w) == 2);
+  if (get_atom(waters[w].H1).occupied) {
+    if (nh == 0) ih1 = waters[w].H1;
+    if (nh == 1) ih2 = waters[w].H1;
+    nh++;
+  }
+  if (get_atom(waters[w].H1).occupied) {
+    if (nh == 0) ih1 = waters[w].H2;
+    if (nh == 1) ih2 = waters[w].H2;
+    nh++;
+  }
+  if (get_atom(waters[w].H1).occupied) {
+    if (nh == 0) ih1 = waters[w].H3;
+    if (nh == 1) ih2 = waters[w].H3;
+    nh++;
+  }
+  if (get_atom(waters[w].H1).occupied) {
+    if (nh == 0) ih1 = waters[w].H4;
+    if (nh == 1) ih2 = waters[w].H4;
+    nh++;
+  }
+
+  oh1 = mic_cart(get_atom(io), get_atom(ih1));
+  oh2 = mic_cart(get_atom(io), get_atom(ih2));
+  return (oh1 + oh2).normalized()*ice_h2o_dipole_mag;
+}
+
+// Check the dipole moment of the unit cell using the C1 constraint
+// (Hayward/Reimers JCP 106, 1518 (1997))
+double Ice::c1_dipole(void)
+{
+  Eigen::Vector3d cell_dipole;
+  cell_dipole << 0.0, 0.0, 0.0;
+
+  for (int i=0; i<nwater; i++){
+    cell_dipole += water_dipole(i);
+  }
+  return cell_dipole.norm();
 }
 
 // Write object to a .cell file

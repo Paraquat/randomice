@@ -1,6 +1,6 @@
 # Library paths
-LPATH =
-IPATH = -I/usr/local/Cellar/eigen/3.3.4/include/eigen3/ -I/usr/local/Cellar/gsl/2.4/include/ -I/usr/local/Cellar/boost/1.64.0_1/include/
+LPATH = -L/Users/zamaan/Software/backward-cpp/
+IPATH = -I/usr/local/Cellar/eigen/3.3.4/include/eigen3/ -I/usr/local/Cellar/gsl/2.4/include/ -I/usr/local/Cellar/boost/1.64.0_1/include/ -I/Users/zamaan/Software/backward-cpp/
 
 # Debugging
 DEBUG =  -g -Wall
@@ -9,4 +9,4 @@ DEBUG =  -g -Wall
 OPT = 
 
 # Compiler
-CC = c++ $(OPT) $(DEBUG) $(LPATH) $(IPATH)
+CC = g++ $(OPT) $(DEBUG) $(IPATH)
