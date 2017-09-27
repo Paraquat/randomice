@@ -369,13 +369,12 @@ std::deque<Node> Ice::get_loop(void)
 void Ice::rick_move(void)
 {
   std::deque<Node> loop;
-  loop = get_loop();
+  do loop = get_loop();
+  while (loop.size() < 3);
 
-  // write_highlight_cell("test1.cell", loop2);
   for (int i=0; i<loop.size(); i++){
     swap_h(loop[i].hbond);
   }
-  // write_highlight_cell("test2.cell", loop2);
 }
 
 // Randomise water orientations using Rick algorithm with C1 dipole contraint
@@ -383,7 +382,7 @@ void Ice::rick_randomise(int max_loops)
 {
   std::cout << "Randomising water orientations via Rick algorithm..." 
             << std::endl;
-  int ndefect;
+  int ndefect, nmove, naccepted;
   double cell_dipole, cell_dipole_old, rn, mcp;
   std::vector<bool> conf;
 
@@ -391,10 +390,13 @@ void Ice::rick_randomise(int max_loops)
 
   cell_dipole_old = c1_dipole();
   conf = save_config();
+  nmove = 0;
+  naccepted = 0;
   for (int i=0; i<max_loops; i++){
     while (true){
       while (true){
         rick_move(); 
+        nmove++;
         ndefect = check_ionic_defects();
         if (ndefect == 0) break;
         else revert_config(conf);
@@ -409,9 +411,14 @@ void Ice::rick_randomise(int max_loops)
       else break;
     }
     conf = save_config();
-    std::cout << "Cell dipole = " << cell_dipole_old << std::endl;
+    std::cout << "Iteration " << i << ": Cell dipole = " 
+              << cell_dipole_old << std::endl;
+    if (cell_dipole < cell_dipole_thresh) break;
     cell_dipole_old = cell_dipole;
   }
+  std::cout << "Total number of moves = " << nmove << std::endl;
+  std::cout << "Finished Rick algorithm. Final dipole = " << cell_dipole 
+            << std::endl;
 }
 
 // Count ionic defects
@@ -477,30 +484,31 @@ Eigen::Vector3d Ice::water_dipole(int w)
   Eigen::Vector3d oh1, oh2;
 
   int nh = 0;
-  int io = waters[w].O;
+  int io = waters.at(w).O;
   int ih1, ih2;
   assert(water_coord(w) == 2);
-  if (get_atom(waters[w].H1).occupied) {
-    if (nh == 0) ih1 = waters[w].H1;
-    if (nh == 1) ih2 = waters[w].H1;
+  if (get_atom(waters.at(w).H1).occupied) {
+    if (nh == 0) ih1 = waters.at(w).H1;
+    if (nh == 1) ih2 = waters.at(w).H1;
     nh++;
   }
-  if (get_atom(waters[w].H1).occupied) {
-    if (nh == 0) ih1 = waters[w].H2;
-    if (nh == 1) ih2 = waters[w].H2;
+  if (get_atom(waters.at(w).H2).occupied) {
+    if (nh == 0) ih1 = waters.at(w).H2;
+    if (nh == 1) ih2 = waters.at(w).H2;
     nh++;
   }
-  if (get_atom(waters[w].H1).occupied) {
-    if (nh == 0) ih1 = waters[w].H3;
-    if (nh == 1) ih2 = waters[w].H3;
+  if (get_atom(waters.at(w).H3).occupied) {
+    if (nh == 0) ih1 = waters.at(w).H3;
+    if (nh == 1) ih2 = waters.at(w).H3;
     nh++;
   }
-  if (get_atom(waters[w].H1).occupied) {
-    if (nh == 0) ih1 = waters[w].H4;
-    if (nh == 1) ih2 = waters[w].H4;
+  if (get_atom(waters.at(w).H4).occupied) {
+    if (nh == 0) ih1 = waters.at(w).H4;
+    if (nh == 1) ih2 = waters.at(w).H4;
     nh++;
   }
 
+  // std::cout << w << " " << io << " " << ih1 << " " << ih2 << std::endl;
   oh1 = mic_cart(get_atom(io), get_atom(ih1));
   oh2 = mic_cart(get_atom(io), get_atom(ih2));
   return (oh1 + oh2).normalized()*ice_h2o_dipole_mag;

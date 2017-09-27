@@ -12,6 +12,7 @@ class Water {
     int O, H1, H2, H3, H4, target;
     std::string ionic;
     std::deque<int> hbonds;
+    bool surface;
 
     Water();
     virtual ~Water();
