@@ -1,7 +1,6 @@
 #include "cell.h"
 #include "water.h"
 #include "hbond.h"
-#include <tuple>
 #include <vector>
 #include <gsl/gsl_rng.h>
 
@@ -23,11 +22,12 @@ struct Node {
 
 class Ice: public Cell {
   private:
-    gsl_rng *r;
+    gsl_rng *rp;
   public:
     std::deque<Water> waters;
     std::deque<Hbond> hbonds;
-    int nwater, nhbond;
+    std::deque<int> s1list, s2list;
+    int nwater, nhbond, nbilayer;
 
     Ice();
     virtual ~Ice();
@@ -61,6 +61,11 @@ class Ice: public Cell {
     int check_bjerrum_defects(void);
     Eigen::Vector3d water_dipole(int);
     double c1_dipole(void);
+
+    void build_slab(double, int);
+    std::deque<int> find_dOH(int);
+    double order_parameter(double);
+    double build_ordered_slab(double, int, double);
 
     void write_cell(std::string);
     void write_chunk_cell(std::string, std::deque<int>);

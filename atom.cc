@@ -91,6 +91,11 @@ std::ofstream& operator<< (std::ofstream& ofs, Atom& a)
   return ofs;
 }
 
+void Atom::move(Eigen::Vector3d trans)
+{
+  r += trans;
+}
+
 void Atom::occupy(bool occ)
 {
   occupied = occ;

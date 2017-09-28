@@ -2,7 +2,7 @@ include Makefile.inc
 .DEFAULT_GOAL = randomice
 PROG = randomice
 
-LIBS = -lboost_program_options -lgsl -lbackward
+LIBS = -lboost_program_options -lgsl
 CCFLAGS = 
 LDFLAGS = -std=c++11 -stdlib=libc++
 HEADERS = atom.h water.h hbond.h cell.h ice.h randomice.h constants.h

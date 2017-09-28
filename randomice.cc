@@ -63,8 +63,10 @@ int main(int argc, char* argv[]){
   if (nbjerrum != 0){
     std::cout << "WARNING: " << nbjerrum << " Bjerrum defects" << std::endl;
   }
-  ice.rick_randomise(100000);
-  std::cout << "Randomisation complete";
+  // ice.rick_randomise(100000);
+  // std::cout << "Randomisation complete";
+  // ice.build_slab(dhkl_default, 2);
+  ice.build_ordered_slab(dhkl_default, 2, 2.0);
   nionic = ice.check_ionic_defects();
   nbjerrum = ice.check_bjerrum_defects();
   if (nionic != 0){
@@ -73,6 +75,16 @@ int main(int argc, char* argv[]){
   if (nbjerrum != 0){
     std::cout << "WARNING: " << nbjerrum << " Bjerrum defects" << std::endl;
   }
+  std::deque<int> slist;
+  for (int i=0; i<ice.s1list.size(); i++) slist.push_back(ice.s1list[i]);
+  for (int i=0; i<ice.s2list.size(); i++) slist.push_back(ice.s2list[i]);
+
+  ice.write_highlight_cell("surface.cell", slist);
+  std::deque<int> dOHlist = ice.find_dOH(2);
+  ice.write_highlight_cell("dOH.cell", dOHlist);
+  double cOH = ice.order_parameter(surface_nn_cut);
+  std::cout << "cOH = " << cOH << std::endl;
+
   ice.write_cell("iceIh.cell");
 
   return 0;

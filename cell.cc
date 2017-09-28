@@ -169,11 +169,30 @@ void Cell::write_cell(std::string fname)
   else outfile << "%ENDBLOCK positions_abs" << std::endl << std::endl;
 }
 
+// Write object to a .xyz file
+void Cell::write_xyz(std::string fname, std::string comment)
+{
+  std::ofstream     outfile(fname.c_str());
+
+  if (outfile.fail()) {
+    std::cout << "Error opening file " << fname << std::endl;
+  }
+
+  outfile << natoms << std::endl;
+  outfile << comment << std::endl;
+  if (frac) frac2cart_all();
+  for (int i=0; i<natoms; i++) {
+    if (atoms[i].occupied){
+      outfile << atoms[i] << std::endl;
+    }
+  }
+}
+
 // Wrap the atoms back into the unit cell if necessary
 void Cell::wrap(void)
 {
   std::cout << "Wrapping atoms into unit cell" << std::endl;
-  assert(frac == true);
+  if (frac == false) cart2frac_all();
   for (int i=0; i<natoms; i++) {
     for (int j=0; j<=2; j++) {
       while (1) {
@@ -195,7 +214,6 @@ void Cell::frac2cart(Atom& a)
 void Cell::frac2cart_all(void)
 {
   std::cout << "Converting coordinates from fractional to Cartesian" << std::endl;
-  wrap();
   for (int i=0; i<natoms; i++) {
     frac2cart(atoms[i]);
   }  
@@ -216,7 +234,6 @@ void Cell::cart2frac_all(void)
     cart2frac(atoms[i]);
   }  
   frac = true;
-  wrap();
 }
 
 // Compute the vector between two atoms with PBCs using the Minimum Image
@@ -273,6 +290,7 @@ Cell Cell::super(int a, int b, int c)
   lat_super.row(1) = lat.row(1)*static_cast<double>(b);
   lat_super.row(2) = lat.row(2)*static_cast<double>(c);
   Cell sc(lat_super);
+  sc.lat_inv = sc.lat.inverse();
 
   scdim << static_cast<double>(a), static_cast<double>(b), \
            static_cast<double>(c);
@@ -338,4 +356,17 @@ bool Cell::isPointOnLine(Atom& a, Atom& b, Atom& c)
     }
   }
   return on_line;
+}
+
+// Shift all atomic coordinates by a constant
+void Cell::shift(double xs, double ys, double zs)
+{
+  Eigen::Vector3d sh;
+  sh << xs, ys, zs;
+  if (frac) frac2cart_all();
+  for (int i=0; i<natoms; i++){
+    atoms[i].move(sh);
+  }
+  wrap();
+  frac2cart_all();
 }

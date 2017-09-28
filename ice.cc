@@ -13,6 +13,7 @@ Ice::~Ice()
 Ice::Ice(Cell& cell)
 {
   lat = cell.lat;
+  lat_inv = lat.inverse();
   atoms = cell.atoms;
   natoms = cell.natoms;
   frac = cell.frac; 
@@ -184,19 +185,19 @@ void Ice::print_ice(void)
 
 void Ice::init_rng(void)
 {
-  r = gsl_rng_alloc(gsl_rng_mt19937);
+  rp = gsl_rng_alloc(gsl_rng_mt19937);
   gsl_rng_env_setup();
-  gsl_rng_set(r, time(0));
+  gsl_rng_set(rp, time(0));
 }
 
 int Ice::rng_int(int a)
 {
-  return gsl_rng_get(r)%a;
+  return gsl_rng_get(rp)%a;
 }
 
 double Ice::rng_uniform(void)
 {
-  return gsl_rng_uniform(r);
+  return gsl_rng_uniform(rp);
 }
 
 // Populate each hydrogen bond with one hydrogen, pick one of two randoms sites
@@ -403,11 +404,11 @@ void Ice::rick_randomise(int max_loops)
       }
       // Monte Carlo criterion
       cell_dipole = c1_dipole();
-      if (cell_dipole > cell_dipole_old){
-        mcp = exp(cell_dipole_old - cell_dipole);
-        rn = rng_uniform();
-        if (rn > mcp) revert_config(conf);
-      }
+//      if (cell_dipole > cell_dipole_old){
+      mcp = exp(cell_dipole_old - cell_dipole);
+      rn = rng_uniform();
+      if (rn > mcp) revert_config(conf);
+//      }
       else break;
     }
     conf = save_config();
@@ -525,6 +526,264 @@ double Ice::c1_dipole(void)
     cell_dipole += water_dipole(i);
   }
   return cell_dipole.norm();
+}
+
+// Construct a slab in the defined direction (perpendicular to bilayers)
+// Put bilayer 1 at the bottom of the slab
+void Ice::build_slab(double dhkl, int direction)
+{
+  std::cout << "Constructing a slab in direction " << direction 
+            << " with dhkl " << dhkl << std::endl;
+  wrap();
+  // Assign each water molecule to a bilayer
+  int bilayer;
+  double r;
+  nbilayer = static_cast<int>(round(lat(direction,direction)/dhkl));
+
+  for (int i=0; i<waters.size(); i++){
+    r = get_atom(waters[i].O).r(direction);
+    bilayer = static_cast<int>(ceil(r/dhkl));
+    waters[i].bilayer = bilayer;
+  }
+
+  int ibilayer1 = 0;
+  for (int i=0; i<nwater; i++){
+    if (waters[i].bilayer == 1){
+      ibilayer1 = i;
+      break;
+    }
+  }
+
+  // Shift all atoms such that bilayer 1 is at the bottom of the cell
+  double rbilayer1 = get_atom(waters[ibilayer1].O).r(direction);
+  double lshift = -rbilayer1 + dhkl/2.0;
+  switch(direction){
+    case 0:
+      shift(lshift, 0.0, 0.0);
+    case 1:
+      shift(0.0, lshift, 0.0);
+    case 2:
+      shift(0.0, 0.0, lshift);
+  }
+
+  // label the surface water molecules
+  double ormin = lat(direction, direction);
+  double ormax = 0.0;
+  double thresh = 0.1;
+  for (int i=0; i<nwater; i++){
+    r = get_atom(waters[i].O).r(direction);
+    if (r < ormin) ormin = r;
+    if (r > ormax) ormax = r;
+  }
+  for (int i=0; i<nwater; i++){
+    r = get_atom(waters[i].O).r(direction);
+    if (r < (ormin+thresh)){
+      waters[i].surface1 = true; 
+      s1list.push_back(i);
+    }
+    else waters[i].surface1 = false;
+    if (r > (ormax-thresh)){
+      waters[i].surface2 = true;
+      s2list.push_back(i);
+    }
+    else waters[i].surface2 = false;
+  }
+}
+
+// Find and label dangling H
+std::deque<int> Ice::find_dOH(int direction)
+{
+  // std::cout << "Finding dangling OH bonds..." << std::endl;
+  // reference vector to compare direction
+  Eigen::Vector3d ref;
+  switch (direction){
+    case 0:
+      ref << 1.0, 0.0, 0.0;
+    case 1:
+      ref << 0.0, 1.0, 0.0;
+    case 2:
+      ref << 0.0, 0.0, 1.0;
+  }
+
+  int w;
+  std::deque<int> dOHlist;
+  Eigen::Vector3d oh1, oh2, oh3, oh4;
+  for (int i=0; i<s1list.size(); i++){
+    w = s1list[i];
+    waters[w].dOH = false;
+    oh1 = mic_cart(get_atom(waters[w].O), get_atom(waters[w].H1));
+    oh2 = mic_cart(get_atom(waters[w].O), get_atom(waters[w].H2));
+    oh3 = mic_cart(get_atom(waters[w].O), get_atom(waters[w].H3));
+    oh4 = mic_cart(get_atom(waters[w].O), get_atom(waters[w].H4));
+    if (get_atom(waters[w].H1).occupied){
+      if (oh1.cross(ref).norm() < small){
+        waters[w].dOH = true;
+        dOHlist.push_back(w);
+      }
+    }
+    if (get_atom(waters[w].H2).occupied){
+      if (oh2.cross(ref).norm() < small){
+        waters[w].dOH = true;
+        dOHlist.push_back(w);
+      }
+    }
+    if (get_atom(waters[w].H3).occupied){
+      if (oh3.cross(ref).norm() < small){
+        waters[w].dOH = true;
+        dOHlist.push_back(w);
+      }
+    }
+    if (get_atom(waters[w].H4).occupied){
+      if (oh4.cross(ref).norm() < small){
+        waters[w].dOH = true;
+        dOHlist.push_back(w);
+      }
+    }
+  }  
+  for (int i=0; i<s2list.size(); i++){
+    w = s2list[i];
+    waters[w].dOH = false;
+    oh1 = mic_cart(get_atom(waters[w].O), get_atom(waters[w].H1));
+    oh2 = mic_cart(get_atom(waters[w].O), get_atom(waters[w].H2));
+    oh3 = mic_cart(get_atom(waters[w].O), get_atom(waters[w].H3));
+    oh4 = mic_cart(get_atom(waters[w].O), get_atom(waters[w].H4));
+    if (get_atom(waters[w].H1).occupied){
+      if (oh1.cross(ref).norm() < small){
+        waters[w].dOH = true;
+        dOHlist.push_back(w);
+      }
+    }
+    if (get_atom(waters[w].H2).occupied){
+      if (oh2.cross(ref).norm() < small){
+        waters[w].dOH = true;
+        dOHlist.push_back(w);
+      }
+    }
+    if (get_atom(waters[w].H3).occupied){
+      if (oh3.cross(ref).norm() < small){
+        waters[w].dOH = true;
+        dOHlist.push_back(w);
+      }
+    }
+    if (get_atom(waters[w].H4).occupied){
+      if (oh4.cross(ref).norm() < small){
+        waters[w].dOH = true;
+        dOHlist.push_back(w);
+      }
+    }
+  }  
+  return dOHlist;
+}
+
+// Compute surface order parameter
+double Ice::order_parameter(double surface_nn_cutoff)
+{
+  int s_nn_total = 0; // running total of dangling OH surface neighbours 
+  int ndOH = 0;
+  int w1, w2, o1, o2;
+
+  for (int i=0; i<s1list.size(); i++){
+    w1 = s1list[i];
+    if (!waters[w1].dOH) continue;
+    else ndOH++;
+    o1 = waters[w1].O;
+    for(int j=0; j<s1list.size(); j++){
+      w2 = s1list[j];
+      o2 = waters[w2].O;
+      if (i != j){
+        if (dt(o1, o2) < surface_nn_cutoff){
+          if (waters[w2].dOH) s_nn_total++;
+        }
+      } 
+    } 
+  }
+
+  for (int i=0; i<s2list.size(); i++){
+    w1 = s2list[i];
+    if (!waters[w1].dOH) continue;
+    else ndOH++;
+    o1 = waters[w1].O;
+    for(int j=0; j<s2list.size(); j++){
+      w2 = s2list[j];
+      o2 = waters[w2].O;
+      if (i != j){
+        if (dt(o1, o2) < surface_nn_cutoff){
+          if (waters[w2].dOH) s_nn_total++;
+        }
+      } 
+    } 
+  }
+  // std::cout << s_nn_total << " " << ndOH << std::endl;
+
+  return static_cast<double>(s_nn_total)/static_cast<double>(ndOH);
+}
+
+double Ice::build_ordered_slab(double dhkl, int direction, double target_cOH)
+{
+  build_slab(dhkl, direction);
+  std::cout << "Constructing slab via Rick algorithm" << std::endl;
+  std::cout << "Target c_OH = " << target_cOH << std::endl;
+
+  int max_loops = 1000;
+  std::deque<int> dOHlist;
+  int ndefect, nmove, naccepted;
+  double cell_dipole, cell_dipole_old, rn, mcp, cOH, cOH_diff, cOH_diff_old;
+  std::vector<bool> conf;
+
+  init_rng();
+
+  cell_dipole_old = c1_dipole();
+  dOHlist = find_dOH(direction);
+  cOH = order_parameter(surface_nn_cut);
+  cOH_diff_old = std::abs(cOH - target_cOH);
+  conf = save_config();
+  nmove = 0;
+  naccepted = 0;
+  for (int i=0; i<max_loops; i++){
+    while (true){
+      while (true){
+        rick_move(); 
+        nmove++;
+        ndefect = check_ionic_defects();
+        if (ndefect == 0) break;
+        else revert_config(conf);
+      }
+      // Monte Carlo criterion
+      cell_dipole = c1_dipole();
+      dOHlist = find_dOH(direction);
+      cOH = order_parameter(surface_nn_cut);
+      cOH_diff = std::abs(cOH - target_cOH);
+
+      mcp = exp(cell_dipole_old - cell_dipole);
+      rn = rng_uniform();
+      if (rn > mcp) revert_config(conf);
+      else {
+        mcp = exp(cOH_diff_old - cOH_diff);
+        rn = rng_uniform();
+        // if (rn > 0.5) revert_config();
+        if (rn > mcp) revert_config(conf);
+        else break;
+      }
+    }
+    conf = save_config();
+    std::cout << "Iteration " << i << std::endl;
+    std::cout << "  Cell dipole = " << cell_dipole_old << std::endl;
+    std::cout << "  cOH         = " << cOH << std::endl;
+    cell_dipole_old = cell_dipole;
+    cOH_diff_old = cOH_diff;
+    if (cell_dipole < cell_dipole_thresh){
+      if (cOH_diff <= cOH_thresh) break;
+    }
+    if (i == max_loops-1){
+      std::cout << "Exceeded maximum iterations (" << max_loops << ")" 
+                << std::endl;
+    }
+  }
+  std::cout << "Total number of moves = " << nmove << std::endl;
+  std::cout << "Finished Rick algorithm. " << std::endl;
+  std::cout << "  Final dipole = " << cell_dipole << std::endl;
+  std::cout << "  Final cOH     = " << cOH << std::endl;
+  return cOH;
 }
 
 // Write object to a .cell file

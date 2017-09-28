@@ -42,5 +42,7 @@ class Cell {
     void add_atom(Atom&);
     void read_cell(std::string);
     virtual void write_cell(std::string);
+    void write_xyz(std::string, std::string);
     Cell super(int, int, int);
+    void shift(double, double, double);
 };

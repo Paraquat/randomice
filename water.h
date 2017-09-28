@@ -9,10 +9,11 @@ class Water {
   private:
   protected:
   public:
-    int O, H1, H2, H3, H4, target;
+    int O, H1, H2, H3, H4, bilayer;
     std::string ionic;
     std::deque<int> hbonds;
-    bool surface;
+    bool surface1, surface2; // is the molecule on either surface?
+    bool dOH;                // does the molecule have a dangling H?
 
     Water();
     virtual ~Water();
