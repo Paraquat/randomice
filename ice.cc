@@ -64,6 +64,7 @@ void Ice::add_hbond(Hbond& h)
 
 void Ice::get_waters(void)
 {
+  std::cout << "Finding water molecules" << std::endl;
   get_dt();
   for (int i=0; i<natoms; i++){
     if (atoms[i].name == "O"){
@@ -325,14 +326,14 @@ void Ice::revert_config(std::vector<bool> conf)
 
 // Find a closed loop of hydrogen bonds (in direction of donation). May cross
 // cell boundary and end in a image
-std::deque<Node> Ice::get_loop(void)
+std::deque<Node> Ice::get_loop(int w_start)
 {
   std::deque<Node> loop;
   int current, hb, target;
   bool end;
 
   init_rng();
-  current = rng_int(nwater);
+  current = w_start;
   while (true){
     hb = rng_int(4);
     target = hb_target(waters[current].hbonds[hb]);
@@ -367,10 +368,11 @@ std::deque<Node> Ice::get_loop(void)
 }
 
 // Perform a move of the Rick algorithm (Rick/Haymet JCP  118, 9291 (2003))
-void Ice::rick_move(void)
+void Ice::rick_move(int w_start)
 {
   std::deque<Node> loop;
-  do loop = get_loop();
+  assert(w_start < nwater);
+  do loop = get_loop(w_start);
   while (loop.size() < 3);
 
   for (int i=0; i<loop.size(); i++){
@@ -383,7 +385,7 @@ void Ice::rick_randomise(int max_loops)
 {
   std::cout << "Randomising water orientations via Rick algorithm..." 
             << std::endl;
-  int ndefect, nmove, naccepted;
+  int ndefect, nmove, naccepted, loop_start;
   double cell_dipole, cell_dipole_old, rn, mcp;
   std::vector<bool> conf;
 
@@ -396,7 +398,8 @@ void Ice::rick_randomise(int max_loops)
   for (int i=0; i<max_loops; i++){
     while (true){
       while (true){
-        rick_move(); 
+        loop_start = rng_int(nwater);   // Pick a randomw water to start loop
+        rick_move(loop_start); 
         nmove++;
         ndefect = check_ionic_defects();
         if (ndefect == 0) break;
@@ -718,15 +721,14 @@ double Ice::order_parameter(double surface_nn_cutoff)
   return static_cast<double>(s_nn_total)/static_cast<double>(ndOH);
 }
 
-double Ice::build_ordered_slab(double dhkl, int direction, double target_cOH)
+void Ice::build_ordered_slab(double dhkl, int direction, double target_cOH, int max_loops)
 {
   build_slab(dhkl, direction);
   std::cout << "Constructing slab via Rick algorithm" << std::endl;
   std::cout << "Target c_OH = " << target_cOH << std::endl;
 
-  int max_loops = 1000;
   std::deque<int> dOHlist;
-  int ndefect, nmove, naccepted;
+  int ndefect, nmove, naccepted, loop_start;
   double cell_dipole, cell_dipole_old, rn, mcp, cOH, cOH_diff, cOH_diff_old;
   std::vector<bool> conf;
 
@@ -742,7 +744,12 @@ double Ice::build_ordered_slab(double dhkl, int direction, double target_cOH)
   for (int i=0; i<max_loops; i++){
     while (true){
       while (true){
-        rick_move(); 
+        // Start the loop from the surface to force cOH to change more 
+        // frequently
+        rn = rng_uniform();
+        if (rn < 0.5) loop_start = s1list[rng_int(s1list.size())];
+        else loop_start = s2list[rng_int(s2list.size())];
+        rick_move(loop_start); 
         nmove++;
         ndefect = check_ionic_defects();
         if (ndefect == 0) break;
@@ -758,7 +765,7 @@ double Ice::build_ordered_slab(double dhkl, int direction, double target_cOH)
       rn = rng_uniform();
       if (rn > mcp) revert_config(conf);
       else {
-        mcp = exp(cOH_diff_old - cOH_diff);
+        mcp = exp((cOH_diff_old - cOH_diff)*20.0);
         rn = rng_uniform();
         // if (rn > 0.5) revert_config();
         if (rn > mcp) revert_config(conf);
@@ -783,7 +790,6 @@ double Ice::build_ordered_slab(double dhkl, int direction, double target_cOH)
   std::cout << "Finished Rick algorithm. " << std::endl;
   std::cout << "  Final dipole = " << cell_dipole << std::endl;
   std::cout << "  Final cOH     = " << cOH << std::endl;
-  return cOH;
 }
 
 // Write object to a .cell file

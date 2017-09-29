@@ -53,8 +53,8 @@ class Ice: public Cell {
 
     std::vector<bool> save_config(void);
     void revert_config(std::vector<bool>);
-    std::deque<Node> get_loop(void);
-    void rick_move(void);
+    std::deque<Node> get_loop(int);
+    void rick_move(int);
     void rick_randomise(int);
 
     int check_ionic_defects(void);
@@ -65,7 +65,7 @@ class Ice: public Cell {
     void build_slab(double, int);
     std::deque<int> find_dOH(int);
     double order_parameter(double);
-    double build_ordered_slab(double, int, double);
+    void build_ordered_slab(double, int, double, int);
 
     void write_cell(std::string);
     void write_chunk_cell(std::string, std::deque<int>);

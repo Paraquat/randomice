@@ -8,11 +8,14 @@ int main(int argc, char* argv[]){
   std::string infname;
   std::vector<int> scdim;
   int scx, scy, scz;
+  int maxiter = 1000;
 
   desc.add_options()
     ("help,h", "Print help information")
     ("infile,i", po::value< std::string >(), "Input structure file")
     ("debug,d", po::value< bool >(), "Run in debug mode")
+    ("maxiter,m", po::value< int >(),
+     "Maximum number of Rick algorithm iterations")
     ("supercell,s", po::value<std::vector<int> >() -> multitoken(), 
      "Supercell dimensions (a x b x c)")
     ;
@@ -38,6 +41,9 @@ int main(int argc, char* argv[]){
     scx = 1;
     scy = 1;
     scz = 1;
+  }
+  if (vm.count("maxiter")){
+    maxiter = vm["maxiter"].as<int>();
   }
 
   Cell cell;
@@ -66,7 +72,7 @@ int main(int argc, char* argv[]){
   // ice.rick_randomise(100000);
   // std::cout << "Randomisation complete";
   // ice.build_slab(dhkl_default, 2);
-  ice.build_ordered_slab(dhkl_default, 2, 2.0);
+  ice.build_ordered_slab(dhkl_default, 2, 2.0, maxiter);
   nionic = ice.check_ionic_defects();
   nbjerrum = ice.check_bjerrum_defects();
   if (nionic != 0){
@@ -82,8 +88,7 @@ int main(int argc, char* argv[]){
   ice.write_highlight_cell("surface.cell", slist);
   std::deque<int> dOHlist = ice.find_dOH(2);
   ice.write_highlight_cell("dOH.cell", dOHlist);
-  double cOH = ice.order_parameter(surface_nn_cut);
-  std::cout << "cOH = " << cOH << std::endl;
+  ice.order_parameter(surface_nn_cut);
 
   ice.write_cell("iceIh.cell");
 
