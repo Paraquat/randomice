@@ -97,7 +97,6 @@ void Ice::get_hbonds(void)
   bool done;
 
   nhbond = 0;
-  get_dt();
 
   for (int i=0; i<nwater; i++){
     int io1 = waters[i].O;
@@ -388,6 +387,8 @@ void Ice::rick_randomise(int max_loops)
   int ndefect, nmove, naccepted, loop_start;
   double cell_dipole, cell_dipole_old, rn, mcp;
   std::vector<bool> conf;
+  unsigned int loop = 0;
+  boost::progress_display show_progress(loop);
 
   init_rng();
 
@@ -395,7 +396,7 @@ void Ice::rick_randomise(int max_loops)
   conf = save_config();
   nmove = 0;
   naccepted = 0;
-  for (int i=0; i<max_loops; i++){
+  for (loop=0; loop<max_loops; loop++){
     while (true){
       while (true){
         loop_start = rng_int(nwater);   // Pick a randomw water to start loop
@@ -415,8 +416,11 @@ void Ice::rick_randomise(int max_loops)
       else break;
     }
     conf = save_config();
-    std::cout << "Iteration " << i << ": Cell dipole = " 
-              << cell_dipole_old << std::endl;
+    if (flag_debug){
+      std::cout << "Iteration " << loop << ": Cell dipole = " 
+                << cell_dipole_old << std::endl;
+    }
+    else ++show_progress;
     if (cell_dipole < cell_dipole_thresh) break;
     cell_dipole_old = cell_dipole;
   }
@@ -765,7 +769,7 @@ void Ice::build_ordered_slab(double dhkl, int direction, double target_cOH, int 
       rn = rng_uniform();
       if (rn > mcp) revert_config(conf);
       else {
-        mcp = exp((cOH_diff_old - cOH_diff)*20.0);
+        mcp = exp((cOH_diff_old - cOH_diff)*50.0);
         rn = rng_uniform();
         // if (rn > 0.5) revert_config();
         if (rn > mcp) revert_config(conf);

@@ -14,7 +14,7 @@ class Atom {
   public:
     std::string name;
     Eigen::Vector3d r;
-    int label, nneighbour;
+    int label, nneighbour, species;
     bool occupied;
     typedef std::shared_ptr<Atom> atom_ptr;
     std::deque<atom_ptr> nn;

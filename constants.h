@@ -8,3 +8,4 @@ const double cell_dipole_thresh = 1E-3;
 const double dhkl_default = 3.6679;
 const double surface_nn_cut = 4.6;
 const double cOH_thresh = 0.1;
+const double ang2bohr = 1.8897259885789;

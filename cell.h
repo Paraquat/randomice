@@ -28,6 +28,7 @@ class Cell {
     Eigen::Matrix3d lat;
     std::deque<Atom> atoms;
     bool frac;
+    bool flag_debug;
 
     Cell();
     virtual ~Cell();
@@ -42,6 +43,8 @@ class Cell {
     void add_atom(Atom&);
     void read_cell(std::string);
     virtual void write_cell(std::string);
+    virtual void write_cq(std::string);
+    virtual void write_vasp(std::string);
     void write_xyz(std::string, std::string);
     Cell super(int, int, int);
     void shift(double, double, double);

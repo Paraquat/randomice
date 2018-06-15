@@ -3,6 +3,7 @@
 #include "hbond.h"
 #include <vector>
 #include <gsl/gsl_rng.h>
+#include <boost/progress.hpp>
 
 struct Node {
     int water;

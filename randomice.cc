@@ -9,6 +9,10 @@ int main(int argc, char* argv[]){
   std::vector<int> scdim;
   int scx, scy, scz;
   int maxiter = 1000;
+  bool cq_out = false;
+  bool castep_out = false;
+  bool vasp_out = false;
+  bool flag_debug = false;
 
   desc.add_options()
     ("help,h", "Print help information")
@@ -16,6 +20,9 @@ int main(int argc, char* argv[]){
     ("debug,d", po::value< bool >(), "Run in debug mode")
     ("maxiter,m", po::value< int >(),
      "Maximum number of Rick algorithm iterations")
+    ("cq", po::bool_switch(&cq_out), "Write to Conquest file")
+    ("cell", po::bool_switch(&castep_out), "Write to CASTEP cell file")
+    ("vasp", po::bool_switch(&vasp_out), "Write to VASP POSCAR file")
     ("supercell,s", po::value<std::vector<int> >() -> multitoken(), 
      "Supercell dimensions (a x b x c)")
     ;
@@ -45,6 +52,9 @@ int main(int argc, char* argv[]){
   if (vm.count("maxiter")){
     maxiter = vm["maxiter"].as<int>();
   }
+  if (vm.count("debug")){
+    flag_debug = true;
+  }
 
   Cell cell;
   Cell sc;
@@ -52,6 +62,8 @@ int main(int argc, char* argv[]){
   cell.read_cell(infname);
   sc = cell.super(scx, scy, scz);
   Ice ice(sc);
+  if (flag_debug) ice.flag_debug = true;
+  else ice.flag_debug = false;
   ice.get_h_pos();
   ice.get_waters();
   ice.get_hbonds();
@@ -90,7 +102,9 @@ int main(int argc, char* argv[]){
   ice.write_highlight_cell("dOH.cell", dOHlist);
   ice.order_parameter(surface_nn_cut);
 
-  ice.write_cell("iceIh.cell");
+  if (cq_out) ice.write_cq("iceIh.coord");
+  else if (vasp_out) ice.write_vasp("iceIh.vasp");
+  else ice.write_cell("iceIh.cell");
 
   return 0;
 }

@@ -152,8 +152,8 @@ void Cell::write_cell(std::string fname)
 
   outfile << "%BLOCK lattice_cart" << std::endl;
   for (int i=0; i<=2; i++) {
-    outfile << std::fixed << std::setprecision(8) \
-            << lat.row(i) << std::endl;
+    outfile << std::fixed << std::setprecision(8)
+            << std::right << std::setw(20) << lat.row(i) << std::endl;
   }
   outfile << "%ENDBLOCK lattice_cart" << std::endl << std::endl;
   if (frac) outfile << "%BLOCK positions_frac" << std::endl;
@@ -167,6 +167,92 @@ void Cell::write_cell(std::string fname)
 
   if (frac) outfile << "%ENDBLOCK positions_frac" << std::endl << std::endl;
   else outfile << "%ENDBLOCK positions_abs" << std::endl << std::endl;
+}
+
+// Write object to a Conquest coord file
+void Cell::write_cq(std::string fname)
+{
+  std::ofstream     outfile(fname.c_str());
+
+  if (!frac) cart2frac_all();
+
+  if (outfile.fail()) {
+    std::cout << "Error opening file " << fname << std::endl;
+  }
+  for (int i=0; i<=2; i++) {
+    outfile << std::fixed << std::setprecision(8) \
+            << lat.row(i)*ang2bohr << std::endl;
+  }
+  outfile << natoms << std::endl;
+
+  for (int i=0; i<natoms; i++) {
+    if (atoms[i].occupied){
+      outfile << std::fixed << std::setprecision(8) 
+              << std::right << std::setw(20) << atoms[i].r[0]
+              << std::right << std::setw(20) << atoms[i].r[1]
+              << std::right << std::setw(20) << atoms[i].r[2]
+              << std::right << std::setw(4) << atoms[i].name 
+              << " T T T" << std::endl;
+    }
+  }
+}
+
+// Write object to a VASP POSCAR file
+void Cell::write_vasp(std::string fname)
+{
+  std::ofstream     outfile(fname.c_str());
+  std::vector<int>  species_count;
+  std::vector<std::string> species;
+  bool              found;
+  int               nspec, spec_ind;
+
+  nspec = 0;
+  for (int i=0; i<natoms; i++){
+    if (atoms[i].occupied){
+      found = false;
+      for (int j=0; j<nspec; j++){
+        if (atoms[i].name == species[j]){
+          found = true;
+          spec_ind = j;
+          break;
+        }
+      }
+      if (!found){
+        species.push_back(atoms[i].name);
+        species_count.push_back(1);
+        nspec++;
+      } else {
+        species_count[spec_ind]++;
+      }
+    }
+  }
+
+  if (!frac) cart2frac_all();
+
+  if (outfile.fail()) {
+    std::cout << "Error opening file " << fname << std::endl;
+  }
+
+  outfile << std::endl;
+  outfile << std::fixed << std::setprecision(4) << 1.0 << std::endl;
+  for (int i=0; i<=2; i++) {
+    outfile << std::fixed << std::right << std::setprecision(8)
+            << lat.row(i) << std::endl;
+  }
+
+  for (int i=0; i<nspec; i++) outfile << std::setw(6) << species[i];
+  outfile << std::endl;
+  for (int i=0; i<nspec; i++) outfile << std::setw(6) << species_count[i];
+  outfile << std::endl << "Direct" << std::endl;
+
+  for (int i=0; i<natoms; i++) {
+    if (atoms[i].occupied){
+      outfile << std::fixed << std::setprecision(8) 
+              << std::right << std::setw(20) << atoms[i].r[0]
+              << std::right << std::setw(20) << atoms[i].r[1]
+              << std::right << std::setw(20) << atoms[i].r[2] << std::endl;
+    }
+  }
 }
 
 // Write object to a .xyz file
