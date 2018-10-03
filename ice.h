@@ -28,7 +28,7 @@ class Ice: public Cell {
     std::deque<Water> waters;
     std::deque<Hbond> hbonds;
     std::deque<int> s1list, s2list;
-    int nwater, nhbond, nbilayer;
+    int nwater, nhbond, nbilayer, noccupied;
 
     Ice();
     virtual ~Ice();
@@ -67,6 +67,7 @@ class Ice: public Cell {
     std::deque<int> find_dOH(int);
     double order_parameter(double);
     void build_ordered_slab(double, int, double, int);
+    void build_step(std::string, double, double, std::string);
 
     void write_cell(std::string);
     void write_chunk_cell(std::string, std::deque<int>);

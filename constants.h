@@ -1,3 +1,5 @@
+#ifndef CONSTANTS_H
+#define CONSTANTS_H
 const double small = 1.0e-3;
 const double very_small = 1.e-8;
 const double oh_default = 0.957;
@@ -9,3 +11,4 @@ const double dhkl_default = 3.6679;
 const double surface_nn_cut = 4.6;
 const double cOH_thresh = 0.1;
 const double ang2bohr = 1.8897259885789;
+#endif

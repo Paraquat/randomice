@@ -203,6 +203,7 @@ double Ice::rng_uniform(void)
 // Populate each hydrogen bond with one hydrogen, pick one of two randoms sites
 void Ice::populate_h_random(void)
 {
+  noccupied = natoms;
   std::cout << "Randomly assigning hydrogens, one per hydrogen bond" << std::endl;
   int rn;
   init_rng();
@@ -215,6 +216,7 @@ void Ice::populate_h_random(void)
       atoms[hbonds[i].H1].occupy(false);
       atoms[hbonds[i].H2].occupy(true);
     }
+    noccupied--;
   }
 }
 
@@ -353,7 +355,6 @@ std::deque<Node> Ice::get_loop(int w_start)
         break;
       }
     }
-    // std::cout << current << ": " << hbonds[waters[current].hbonds[hb]].W1 << " " << hbonds[waters[current].hbonds[hb]].W2 << " -> " << target << std::endl;
     loop.push_back(Node(current, waters[current].hbonds[hb]));
     current = target;
     if (end) break;
@@ -516,7 +517,6 @@ Eigen::Vector3d Ice::water_dipole(int w)
     nh++;
   }
 
-  // std::cout << w << " " << io << " " << ih1 << " " << ih2 << std::endl;
   oh1 = mic_cart(get_atom(io), get_atom(ih1));
   oh2 = mic_cart(get_atom(io), get_atom(ih2));
   return (oh1 + oh2).normalized()*ice_h2o_dipole_mag;
@@ -542,6 +542,7 @@ void Ice::build_slab(double dhkl, int direction)
   std::cout << "Constructing a slab in direction " << direction 
             << " with dhkl " << dhkl << std::endl;
   wrap();
+  if (frac) frac2cart_all();
   // Assign each water molecule to a bilayer
   int bilayer;
   double r;
@@ -562,16 +563,16 @@ void Ice::build_slab(double dhkl, int direction)
   }
 
   // Shift all atoms such that bilayer 1 is at the bottom of the cell
-  double rbilayer1 = get_atom(waters[ibilayer1].O).r(direction);
-  double lshift = -rbilayer1 + dhkl/2.0;
-  switch(direction){
-    case 0:
-      shift(lshift, 0.0, 0.0);
-    case 1:
-      shift(0.0, lshift, 0.0);
-    case 2:
-      shift(0.0, 0.0, lshift);
-  }
+  // double rbilayer1 = get_atom(waters[ibilayer1].O).r(direction);
+  // double lshift = -rbilayer1 + dhkl/2.0;
+  // switch(direction){
+  //   case 0:
+  //     shift(lshift, 0.0, 0.0);
+  //   case 1:
+  //     shift(0.0, lshift, 0.0);
+  //   case 2:
+  //     shift(0.0, 0.0, lshift);
+  // }
 
   // label the surface water molecules
   double ormin = lat(direction, direction);
@@ -777,23 +778,172 @@ void Ice::build_ordered_slab(double dhkl, int direction, double target_cOH, int 
       }
     }
     conf = save_config();
-    std::cout << "Iteration " << i << std::endl;
-    std::cout << "  Cell dipole = " << cell_dipole_old << std::endl;
-    std::cout << "  cOH         = " << cOH << std::endl;
-    cell_dipole_old = cell_dipole;
-    cOH_diff_old = cOH_diff;
-    if (cell_dipole < cell_dipole_thresh){
-      if (cOH_diff <= cOH_thresh) break;
-    }
-    if (i == max_loops-1){
-      std::cout << "Exceeded maximum iterations (" << max_loops << ")" 
-                << std::endl;
+    if (flag_debug) {
+      std::cout << "Iteration " << i << std::endl;
+      std::cout << "  Cell dipole = " << cell_dipole_old << std::endl;
+      std::cout << "  cOH         = " << cOH << std::endl;
+      cell_dipole_old = cell_dipole;
+      cOH_diff_old = cOH_diff;
+      if (cell_dipole < cell_dipole_thresh){
+        if (cOH_diff <= cOH_thresh) break;
+      }
+      if (i == max_loops-1){
+        std::cout << "Exceeded maximum iterations (" << max_loops << ")" 
+                  << std::endl;
+      }
     }
   }
   std::cout << "Total number of moves = " << nmove << std::endl;
   std::cout << "Finished Rick algorithm. " << std::endl;
   std::cout << "  Final dipole = " << cell_dipole << std::endl;
   std::cout << "  Final cOH     = " << cOH << std::endl;
+}
+
+// Construct a step: compute which atoms to remove, and move them to 
+// the bottom of the file
+void Ice::build_step(std::string direction, double step_width, 
+                     double vacuum_gap, std::string fname)
+{
+  int dir = 0;
+  std::string t = "T";
+
+  if (frac) frac2cart_all();
+
+  if (direction == "a") dir = 0;
+  else if (direction == "b") dir = 1;
+  else if (direction == "c") dir = 2;
+  else std::cout << "Invalid direction" << std::endl;
+
+  int nstep = noccupied;
+  int iO, iH1, iH2, iH3, iH4;
+  double valley_width = (lat(dir,dir) - step_width)/2.0;
+  double bound1 = valley_width;
+  double bound2 = step_width + valley_width;
+  std:: cout << "bound1 " << bound1 << std:: endl;
+  std:: cout << "bound2 " << bound2 << std:: endl;
+  std::string tag = " # step";
+
+  for (int i=0; i<nwater; i++){
+    if (waters[i].bilayer == 1 or waters[i].bilayer == nbilayer) {
+      iO = waters[i].O;
+      iH1 = waters[i].H1;
+      iH2 = waters[i].H2;
+      iH3 = waters[i].H3;
+      iH4 = waters[i].H4;
+      if (atoms[iO].r[dir] < bound1 or atoms[iO].r[dir] > bound2){
+        atoms[iO].remove = true;
+        atoms[iO].comment = tag;
+        atoms[iH1].remove = true;
+        atoms[iH1].comment = tag;
+        atoms[iH2].remove = true;
+        atoms[iH2].comment = tag;
+        atoms[iH3].remove = true;
+        atoms[iH3].comment = tag;
+        atoms[iH4].remove = true;
+        atoms[iH4].comment = tag;
+        nstep -= 3;
+      }
+    }
+  }
+
+  std::string file_bulk = fname + "_bulk.in";
+  std::string file_slab = fname + "_slab.in";
+  std::string file_step = fname + "_step.in";
+  std::string atom_str;
+  int species_label;
+
+  std::ofstream ofs;
+
+  ofs.open(file_bulk);
+  if (ofs.fail()) {
+    std::cout << "Error opening file " << file_bulk << std::endl;
+  }
+  for (int i=0; i<=2; i++) {
+    ofs << std::fixed << std::setprecision(8) \
+        << lat.row(i)*ang2bohr << std::endl;
+  }
+  ofs << noccupied << std::endl;
+  for (int i=0; i<natoms; i++){
+    if (atoms[i].occupied){
+      if (!atoms[i].remove){
+        if (atoms[i].name == "H") species_label = 1;
+        else if (atoms[i].name == "O") species_label = 2;
+        atom_str = atoms[i].write_cq(species_label, t, t, t);
+        ofs << atom_str << std::endl;
+      }
+    }
+  }
+  for (int i=0; i<natoms; i++){
+    if (atoms[i].occupied){
+      if (atoms[i].remove){
+        if (atoms[i].name == "H") species_label = 1;
+        else if (atoms[i].name == "O") species_label = 2;
+        atom_str = atoms[i].write_cq(species_label, t, t, t);
+        ofs << atom_str << std::endl;
+      }
+    }
+  }
+  ofs.close();
+
+  ofs.open(file_slab);
+  if (ofs.fail()) {
+    std::cout << "Error opening file " << file_slab << std::endl;
+  }
+  Eigen::Vector3d lat_c = lat.row(2);
+  lat_c(2) += vacuum_gap;
+  lat_c *= ang2bohr;
+  ofs << std::fixed << std::setw(14) << std::setprecision(8) \
+      << std::left << lat.row(0)*ang2bohr << std::endl \
+      << std::left << lat.row(1)*ang2bohr << std::endl \
+      << std::left << std::setw(14) << lat_c(0) \
+      << std::left << std::setw(14) << lat_c(1) \
+      << std::left << std::setw(14) << lat_c(2) << std::endl;
+  ofs << noccupied << std::endl;
+  for (int i=0; i<natoms; i++){
+    if (atoms[i].occupied){
+      if (!atoms[i].remove){
+        if (atoms[i].name == "H") species_label = 1;
+        else if (atoms[i].name == "O") species_label = 2;
+        atom_str = atoms[i].write_cq(species_label, t, t, t);
+        ofs << atom_str << std::endl;
+      }
+    }
+  }
+  for (int i=0; i<natoms; i++){
+    if (atoms[i].occupied){
+      if (atoms[i].remove){
+        if (atoms[i].name == "H") species_label = 1;
+        else if (atoms[i].name == "O") species_label = 2;
+        atom_str = atoms[i].write_cq(species_label, t, t, t);
+        ofs << atom_str << std::endl;
+      }
+    }
+  }
+  ofs.close();
+
+  ofs.open(file_step);
+  if (ofs.fail()) {
+    std::cout << "Error opening file " << file_step << std::endl;
+  }
+  ofs << std::fixed << std::setw(14) << std::setprecision(8) \
+      << std::left << lat.row(0)*ang2bohr << std::endl \
+      << std::left << lat.row(1)*ang2bohr << std::endl \
+      // << lat_c(0) << lat_c(1) << lat_c(2) << std::endl;
+      << std::left << std::setw(14) << lat_c(0) \
+      << std::left << std::setw(14) << lat_c(1) \
+      << std::left << std::setw(14) << lat_c(2) << std::endl;
+  ofs << nstep << std::endl;
+  for (int i=0; i<natoms; i++){
+    if (atoms[i].occupied){
+      if (!atoms[i].remove){
+        if (atoms[i].name == "H") species_label = 1;
+        else if (atoms[i].name == "O") species_label = 2;
+        atom_str = atoms[i].write_cq(species_label, t, t, t);
+        ofs << atom_str << std::endl;
+      }
+    }
+  }
+  ofs.close();
 }
 
 // Write object to a .cell file

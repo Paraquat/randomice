@@ -1,3 +1,4 @@
+#include "constants.h"
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -13,9 +14,11 @@ class Atom {
   private:
   public:
     std::string name;
+    std::string comment;
     Eigen::Vector3d r;
     int label, nneighbour, species;
     bool occupied;
+    bool remove;
     typedef std::shared_ptr<Atom> atom_ptr;
     std::deque<atom_ptr> nn;
 
@@ -28,6 +31,7 @@ class Atom {
     Atom& operator= (const Atom&);
     friend std::ostream& operator<< (std::ostream&, Atom&);
     friend std::ofstream& operator<< (std::ofstream&, Atom&);
+    std::string write_cq(int, std::string, std::string, std::string);
     bool operator== (const Atom&);
 
     void move(Eigen::Vector3d);

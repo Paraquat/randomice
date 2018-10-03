@@ -14,7 +14,9 @@ Atom::Atom(std::string symbol, int i, double x, double y, double z)
   label = i;
   r = Eigen::Vector3d(x, y, z);
   occupied = true;
+  remove = false;
   nneighbour = 0;
+  comment = "";
 }
 
 Atom::Atom(std::string symbol, int i, Eigen::Vector3d v)
@@ -23,7 +25,10 @@ Atom::Atom(std::string symbol, int i, Eigen::Vector3d v)
   label = i;
   r = v;
   occupied = true;
+  remove = false;
   nneighbour = 0;
+  nneighbour = 0;
+  comment = "";
 }
 
 // Allow addition of an unoccupied atomic site
@@ -33,7 +38,10 @@ Atom::Atom(std::string symbol, int i, Eigen::Vector3d v, bool occ)
   label = i;
   r = v;
   occupied = occ;
+  remove = false;
   nneighbour = 0;
+  nneighbour = 0;
+  comment = "";
 }
 
 Atom::Atom(const Atom& a)
@@ -43,7 +51,10 @@ Atom::Atom(const Atom& a)
   label = a.label;
   r = a.r;
   occupied = a.occupied;
+  remove = false;
   nneighbour = 0;
+  nneighbour = 0;
+  comment = "";
 }
 
 bool Atom::operator== (const Atom& a)
@@ -89,6 +100,24 @@ std::ofstream& operator<< (std::ofstream& ofs, Atom& a)
       << std::right << std::setw(20) << a.r[1] \
       << std::right << std::setw(20) << a.r[2];
   return ofs;
+}
+
+std::string Atom::write_cq(int spec_int, std::string cx, 
+                     std::string cy, std::string cz)
+{
+  std::ostringstream oss;
+
+  oss  << std::fixed << std::setprecision(8) \
+       << std::right << std::setw(20) << r[0]*ang2bohr \
+       << std::right << std::setw(20) << r[1]*ang2bohr \
+       << std::right << std::setw(20) << r[2]*ang2bohr \
+       << std::right << std::setw(4) << spec_int \
+       << std::right << std::setw(2) << cx \
+       << std::right << std::setw(2) << cy \
+       << std::right << std::setw(2) << cz \
+       << std::right << comment;
+
+  return oss.str();
 }
 
 void Atom::move(Eigen::Vector3d trans)

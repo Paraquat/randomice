@@ -13,16 +13,21 @@ int main(int argc, char* argv[]){
   bool castep_out = false;
   bool vasp_out = false;
   bool flag_debug = false;
+  bool step = false;
 
   desc.add_options()
     ("help,h", "Print help information")
     ("infile,i", po::value< std::string >(), "Input structure file")
-    ("debug,d", po::value< bool >(), "Run in debug mode")
+    ("debug,d", po::bool_switch(&flag_debug), "Run in debug mode")
     ("maxiter,m", po::value< int >(),
      "Maximum number of Rick algorithm iterations")
     ("cq", po::bool_switch(&cq_out), "Write to Conquest file")
     ("cell", po::bool_switch(&castep_out), "Write to CASTEP cell file")
     ("vasp", po::bool_switch(&vasp_out), "Write to VASP POSCAR file")
+    ("step", po::bool_switch(&step), "Construct a step")
+    ("step_direction", po::value< std::string >(), "Direction of step (a,b,c)")
+    ("step_width", po::value< double >(), "Width of step (a0)")
+    ("vacuum_gap", po::value< double >(), "Size of vacuum gap (a0)")
     ("supercell,s", po::value<std::vector<int> >() -> multitoken(), 
      "Supercell dimensions (a x b x c)")
     ;
@@ -52,8 +57,16 @@ int main(int argc, char* argv[]){
   if (vm.count("maxiter")){
     maxiter = vm["maxiter"].as<int>();
   }
-  if (vm.count("debug")){
-    flag_debug = true;
+
+  bool build_step = false;
+  double step_width = 0.0;
+  double vacuum_gap = 0.0;
+  std::string step_direction = "a";
+  if (vm.count("step")){
+    build_step = true;
+    step_width = vm["step_width"].as<double>();
+    vacuum_gap = vm["vacuum_gap"].as<double>();
+    step_direction = vm["step_direction"].as<std::string>();
   }
 
   Cell cell;
@@ -81,9 +94,6 @@ int main(int argc, char* argv[]){
   if (nbjerrum != 0){
     std::cout << "WARNING: " << nbjerrum << " Bjerrum defects" << std::endl;
   }
-  // ice.rick_randomise(100000);
-  // std::cout << "Randomisation complete";
-  // ice.build_slab(dhkl_default, 2);
   ice.build_ordered_slab(dhkl_default, 2, 2.0, maxiter);
   nionic = ice.check_ionic_defects();
   nbjerrum = ice.check_bjerrum_defects();
@@ -93,18 +103,26 @@ int main(int argc, char* argv[]){
   if (nbjerrum != 0){
     std::cout << "WARNING: " << nbjerrum << " Bjerrum defects" << std::endl;
   }
-  std::deque<int> slist;
-  for (int i=0; i<ice.s1list.size(); i++) slist.push_back(ice.s1list[i]);
-  for (int i=0; i<ice.s2list.size(); i++) slist.push_back(ice.s2list[i]);
+  // ice.rick_randomise(100000);
+  // std::cout << "Randomisation complete";
+  // ice.build_slab(dhkl_default, 2);
+  if (build_step) {
+    std::string fname = "ice";
+    ice.build_step(step_direction, step_width, vacuum_gap, fname);
+  } else{
+    std::deque<int> slist;
+    for (int i=0; i<ice.s1list.size(); i++) slist.push_back(ice.s1list[i]);
+    for (int i=0; i<ice.s2list.size(); i++) slist.push_back(ice.s2list[i]);
 
-  ice.write_highlight_cell("surface.cell", slist);
-  std::deque<int> dOHlist = ice.find_dOH(2);
-  ice.write_highlight_cell("dOH.cell", dOHlist);
-  ice.order_parameter(surface_nn_cut);
+    ice.write_highlight_cell("surface.cell", slist);
+    std::deque<int> dOHlist = ice.find_dOH(2);
+    ice.write_highlight_cell("dOH.cell", dOHlist);
+    ice.order_parameter(surface_nn_cut);
 
-  if (cq_out) ice.write_cq("iceIh.coord");
-  else if (vasp_out) ice.write_vasp("iceIh.vasp");
-  else ice.write_cell("iceIh.cell");
+    if (cq_out) ice.write_cq("iceIh.coord");
+    else if (vasp_out) ice.write_vasp("iceIh.vasp");
+    else ice.write_cell("iceIh.cell");
+  }
 
   return 0;
 }

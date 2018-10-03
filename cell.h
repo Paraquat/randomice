@@ -1,5 +1,4 @@
 #include "atom.h"
-#include "constants.h"
 #include <algorithm>
 #include <regex>
 #include <Eigen/LU>     // required for matrix.inverse()
