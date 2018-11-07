@@ -73,6 +73,7 @@ int main(int argc, char* argv[]){
   Cell sc;
 
   cell.read_cell(infname);
+  double dhkl = cell.lat(2,2)/2.0;
   sc = cell.super(scx, scy, scz);
   Ice ice(sc);
   if (flag_debug) ice.flag_debug = true;
@@ -94,7 +95,7 @@ int main(int argc, char* argv[]){
   if (nbjerrum != 0){
     std::cout << "WARNING: " << nbjerrum << " Bjerrum defects" << std::endl;
   }
-  ice.build_ordered_slab(dhkl_default, 2, 2.0, maxiter);
+  ice.build_ordered_slab(dhkl, 2, 2.0, maxiter);
   nionic = ice.check_ionic_defects();
   nbjerrum = ice.check_bjerrum_defects();
   if (nionic != 0){

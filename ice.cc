@@ -624,25 +624,25 @@ std::deque<int> Ice::find_dOH(int direction)
     oh3 = mic_cart(get_atom(waters[w].O), get_atom(waters[w].H3));
     oh4 = mic_cart(get_atom(waters[w].O), get_atom(waters[w].H4));
     if (get_atom(waters[w].H1).occupied){
-      if (oh1.cross(ref).norm() < small){
+      if (oh1.cross(ref).norm() < smallish){
         waters[w].dOH = true;
         dOHlist.push_back(w);
       }
     }
     if (get_atom(waters[w].H2).occupied){
-      if (oh2.cross(ref).norm() < small){
+      if (oh2.cross(ref).norm() < smallish){
         waters[w].dOH = true;
         dOHlist.push_back(w);
       }
     }
     if (get_atom(waters[w].H3).occupied){
-      if (oh3.cross(ref).norm() < small){
+      if (oh3.cross(ref).norm() < smallish){
         waters[w].dOH = true;
         dOHlist.push_back(w);
       }
     }
     if (get_atom(waters[w].H4).occupied){
-      if (oh4.cross(ref).norm() < small){
+      if (oh4.cross(ref).norm() < smallish){
         waters[w].dOH = true;
         dOHlist.push_back(w);
       }
@@ -819,8 +819,8 @@ void Ice::build_step(std::string direction, double step_width,
   double valley_width = (lat(dir,dir) - step_width)/2.0;
   double bound1 = valley_width;
   double bound2 = step_width + valley_width;
-  std:: cout << "bound1 " << bound1 << std:: endl;
-  std:: cout << "bound2 " << bound2 << std:: endl;
+  // std:: cout << "bound1 " << bound1 << std:: endl;
+  // std:: cout << "bound2 " << bound2 << std:: endl;
   std::string tag = " # step";
 
   for (int i=0; i<nwater; i++){
