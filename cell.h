@@ -28,6 +28,7 @@ class Cell {
     std::deque<Atom> atoms;
     bool frac;
     bool flag_debug;
+    Eigen::Vector3d scdim;
 
     Cell();
     virtual ~Cell();

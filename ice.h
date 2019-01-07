@@ -29,11 +29,13 @@ class Ice: public Cell {
     std::deque<Hbond> hbonds;
     std::deque<int> s1list, s2list;
     int nwater, nhbond, nbilayer, noccupied;
+    int xlayers, ylayers, zlayers;
 
     Ice();
     virtual ~Ice();
     Ice(Cell&);
 
+    Ice super(int, int, int);
     void get_h_pos(void);
     void add_water(Water&);
     void add_hbond(Hbond&);

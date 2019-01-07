@@ -17,6 +17,12 @@ Ice::Ice(Cell& cell)
   atoms = cell.atoms;
   natoms = cell.natoms;
   frac = cell.frac; 
+  scdim = cell.scdim;
+}
+
+// Generate a axbxc supercell
+Ice Ice::super(int a, int b, int c)
+{
 }
 
 // Compute all hydrogen positions for a given oxygen lattice
@@ -587,6 +593,7 @@ void Ice::build_slab(double dhkl, int direction)
     r = get_atom(waters[i].O).r(direction);
     if (r < (ormin+thresh)){
       waters[i].surface1 = true; 
+      waters[i].step = 0;
       s1list.push_back(i);
     }
     else waters[i].surface1 = false;
@@ -793,8 +800,8 @@ void Ice::build_ordered_slab(double dhkl, int direction, double target_cOH, int 
       }
     }
   }
-  std::cout << "Total number of moves = " << nmove << std::endl;
   std::cout << "Finished Rick algorithm. " << std::endl;
+  std::cout << "Total number of moves = " << nmove << std::endl;
   std::cout << "  Final dipole = " << cell_dipole << std::endl;
   std::cout << "  Final cOH     = " << cOH << std::endl;
 }
@@ -815,36 +822,76 @@ void Ice::build_step(std::string direction, double step_width,
   else std::cout << "Invalid direction" << std::endl;
 
   int nstep = noccupied;
-  int iO, iH1, iH2, iH3, iH4;
+  int iO, iH1, iH2, iH3, iH4, layer;
   double valley_width = (lat(dir,dir) - step_width)/2.0;
+  double bound_incr = 0.5;
+  double max_bound = lat(dir,dir)/2.0;
   double bound1 = valley_width;
   double bound2 = step_width + valley_width;
+  double binwidth = 0.0;
+  if (dir == 0){
+    binwidth = lat(dir,dir)/static_cast<double>(xlayers);
+  } else if (dir == 1) {
+    binwidth = lat(dir,dir)/static_cast<double>(ylayers);
+  }
   // std:: cout << "bound1 " << bound1 << std:: endl;
   // std:: cout << "bound2 " << bound2 << std:: endl;
-  std::string tag = " # step";
 
+  bound1 = bound_incr;
+  bound2 = lat(dir,dir) - bound_incr;
   for (int i=0; i<nwater; i++){
     if (waters[i].bilayer == 1 or waters[i].bilayer == nbilayer) {
+      std::string tag = " # step ";
       iO = waters[i].O;
       iH1 = waters[i].H1;
       iH2 = waters[i].H2;
       iH3 = waters[i].H3;
       iH4 = waters[i].H4;
-      if (atoms[iO].r[dir] < bound1 or atoms[iO].r[dir] > bound2){
-        atoms[iO].remove = true;
-        atoms[iO].comment = tag;
-        atoms[iH1].remove = true;
-        atoms[iH1].comment = tag;
-        atoms[iH2].remove = true;
-        atoms[iH2].comment = tag;
-        atoms[iH3].remove = true;
-        atoms[iH3].comment = tag;
-        atoms[iH4].remove = true;
-        atoms[iH4].comment = tag;
-        nstep -= 3;
-      }
+      layer = ceil(atoms[iO].r(dir)/binwidth);
+      tag += std::to_string(layer);
+      atoms[iO].comment = tag;
+      atoms[iH1].comment = tag;
+      atoms[iH2].comment = tag;
+      atoms[iH3].comment = tag;
+      atoms[iH4].comment = tag;
+
+      // if (atoms[iO].r[dir] < bound1 or atoms[iO].r[dir] > bound2){
+      //   atoms[iO].remove = true;
+      //   atoms[iO].comment = tag;
+      //   atoms[iH1].remove = true;
+      //   atoms[iH1].comment = tag;
+      //   atoms[iH2].remove = true;
+      //   atoms[iH2].comment = tag;
+      //   atoms[iH3].remove = true;
+      //   atoms[iH3].comment = tag;
+      //   atoms[iH4].remove = true;
+      //   atoms[iH4].comment = tag;
+      //   nstep -= 3;
+      // }
     }
   }
+  // for (int i=0; i<nwater; i++){
+  //   if (waters[i].bilayer == 1 or waters[i].bilayer == nbilayer) {
+  //     iO = waters[i].O;
+  //     iH1 = waters[i].H1;
+  //     iH2 = waters[i].H2;
+  //     iH3 = waters[i].H3;
+  //     iH4 = waters[i].H4;
+  //     if (atoms[iO].r[dir] < bound1 or atoms[iO].r[dir] > bound2){
+  //       atoms[iO].remove = true;
+  //       atoms[iO].comment = tag;
+  //       atoms[iH1].remove = true;
+  //       atoms[iH1].comment = tag;
+  //       atoms[iH2].remove = true;
+  //       atoms[iH2].comment = tag;
+  //       atoms[iH3].remove = true;
+  //       atoms[iH3].comment = tag;
+  //       atoms[iH4].remove = true;
+  //       atoms[iH4].comment = tag;
+  //       nstep -= 3;
+  //     }
+  //   }
+  // }
 
   std::string file_bulk = fname + "_bulk.in";
   std::string file_slab = fname + "_slab.in";
@@ -905,6 +952,7 @@ void Ice::build_step(std::string direction, double step_width,
         if (atoms[i].name == "H") species_label = 1;
         else if (atoms[i].name == "O") species_label = 2;
         atom_str = atoms[i].write_cq(species_label, t, t, t);
+        // atom_str = atoms[i].write_cell();
         ofs << atom_str << std::endl;
       }
     }
@@ -913,37 +961,38 @@ void Ice::build_step(std::string direction, double step_width,
     if (atoms[i].occupied){
       if (atoms[i].remove){
         if (atoms[i].name == "H") species_label = 1;
-        else if (atoms[i].name == "O") species_label = 2;
+        // else if (atoms[i].name == "O") species_label = 2;
         atom_str = atoms[i].write_cq(species_label, t, t, t);
+        atom_str = atoms[i].write_cell();
         ofs << atom_str << std::endl;
       }
     }
   }
   ofs.close();
 
-  ofs.open(file_step);
-  if (ofs.fail()) {
-    std::cout << "Error opening file " << file_step << std::endl;
-  }
-  ofs << std::fixed << std::setw(14) << std::setprecision(8) \
-      << std::left << lat.row(0)*ang2bohr << std::endl \
-      << std::left << lat.row(1)*ang2bohr << std::endl \
-      // << lat_c(0) << lat_c(1) << lat_c(2) << std::endl;
-      << std::left << std::setw(14) << lat_c(0) \
-      << std::left << std::setw(14) << lat_c(1) \
-      << std::left << std::setw(14) << lat_c(2) << std::endl;
-  ofs << nstep << std::endl;
-  for (int i=0; i<natoms; i++){
-    if (atoms[i].occupied){
-      if (!atoms[i].remove){
-        if (atoms[i].name == "H") species_label = 1;
-        else if (atoms[i].name == "O") species_label = 2;
-        atom_str = atoms[i].write_cq(species_label, t, t, t);
-        ofs << atom_str << std::endl;
-      }
-    }
-  }
-  ofs.close();
+  // ofs.open(file_step);
+  // if (ofs.fail()) {
+  //   std::cout << "Error opening file " << file_step << std::endl;
+  // }
+  // ofs << std::fixed << std::setw(14) << std::setprecision(8) \
+  //     << std::left << lat.row(0)*ang2bohr << std::endl \
+  //     << std::left << lat.row(1)*ang2bohr << std::endl \
+  //     // << lat_c(0) << lat_c(1) << lat_c(2) << std::endl;
+  //     << std::left << std::setw(14) << lat_c(0) \
+  //     << std::left << std::setw(14) << lat_c(1) \
+  //     << std::left << std::setw(14) << lat_c(2) << std::endl;
+  // ofs << nstep << std::endl;
+  // for (int i=0; i<natoms; i++){
+  //   if (atoms[i].occupied){
+  //     if (!atoms[i].remove){
+  //       if (atoms[i].name == "H") species_label = 1;
+  //       else if (atoms[i].name == "O") species_label = 2;
+  //       atom_str = atoms[i].write_cq(species_label, t, t, t);
+  //       ofs << atom_str << std::endl;
+  //     }
+  //   }
+  // }
+  // ofs.close();
 }
 
 // Write object to a .cell file

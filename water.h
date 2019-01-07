@@ -15,6 +15,7 @@ class Water {
     bool surface1, surface2; // is the molecule on either surface?
     bool remove;             // remove this molecule to make a step?
     bool dOH;                // does the molecule have a dangling H?
+    int step;                // label for step
 
     Water();
     virtual ~Water();

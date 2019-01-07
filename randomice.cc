@@ -5,11 +5,12 @@ namespace po = boost::program_options;
 int main(int argc, char* argv[]){
 
   po::options_description desc("Allowed options");
-  std::string infname;
+  std::string infname, phase;
   std::vector<int> scdim;
   int scx, scy, scz;
   int maxiter = 1000;
   bool cq_out = false;
+  bool ordered = false;
   bool castep_out = false;
   bool vasp_out = false;
   bool flag_debug = false;
@@ -18,10 +19,12 @@ int main(int argc, char* argv[]){
   desc.add_options()
     ("help,h", "Print help information")
     ("infile,i", po::value< std::string >(), "Input structure file")
+    ("phase,p", po::value< std::string >(), "Input ice phase (Ih, Ic, etc")
     ("debug,d", po::bool_switch(&flag_debug), "Run in debug mode")
     ("maxiter,m", po::value< int >(),
      "Maximum number of Rick algorithm iterations")
     ("cq", po::bool_switch(&cq_out), "Write to Conquest file")
+    ("ordered,o", po::bool_switch(&ordered), "Generate an ordered supercell")
     ("cell", po::bool_switch(&castep_out), "Write to CASTEP cell file")
     ("vasp", po::bool_switch(&vasp_out), "Write to VASP POSCAR file")
     ("step", po::bool_switch(&step), "Construct a step")
@@ -44,6 +47,11 @@ int main(int argc, char* argv[]){
   } else {
     std::cout << "No input structure file specified" << std::endl;
   }
+  if (vm.count("phase")){
+    phase = vm["phase"].as<std::string>();
+  } else {
+    phase = "Ih";
+  }
   if (!vm["supercell"].empty() &&
       (scdim = vm["supercell"].as<std::vector<int> >()).size() == 3){
     scx = scdim[0];
@@ -64,7 +72,11 @@ int main(int argc, char* argv[]){
   std::string step_direction = "a";
   if (vm.count("step")){
     build_step = true;
-    step_width = vm["step_width"].as<double>();
+    if (vm["step_width"].empty()){
+      step_width = 0.0;
+    } else {
+      step_width = vm["step_width"].as<double>();
+    }
     vacuum_gap = vm["vacuum_gap"].as<double>();
     step_direction = vm["step_direction"].as<std::string>();
   }
@@ -86,7 +98,7 @@ int main(int argc, char* argv[]){
   std::cout << ice.nhbond << " hydrogen bonds" << std::endl;
   ice.populate_h_random();
   ice.buch_mc_correct();
-  ice.write_cell("init.cell");
+  // ice.write_cell("init.cell");
   int nionic = ice.check_ionic_defects();
   int nbjerrum = ice.check_bjerrum_defects();
   if (nionic != 0){
@@ -108,6 +120,10 @@ int main(int argc, char* argv[]){
   // std::cout << "Randomisation complete";
   // ice.build_slab(dhkl_default, 2);
   if (build_step) {
+    if (phase == "Ih"){
+      ice.xlayers = 2*scx;
+      ice.ylayers = 2*scy;    
+    }
     std::string fname = "ice";
     ice.build_step(step_direction, step_width, vacuum_gap, fname);
   } else{

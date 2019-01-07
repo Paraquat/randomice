@@ -368,7 +368,7 @@ void  Cell::get_dt(void)
 // Generate a axbxc supercell
 Cell Cell::super(int a, int b, int c)
 {
-  Eigen::Vector3d t, rt, scdim;
+  Eigen::Vector3d t, rt;
   Eigen::Matrix3d lat_super;
 
   assert(frac == true);

@@ -102,6 +102,20 @@ std::ofstream& operator<< (std::ofstream& ofs, Atom& a)
   return ofs;
 }
 
+std::string Atom::write_cell(void)
+{
+  std::ostringstream oss;
+
+  oss << name;
+  oss << std::fixed << std::setprecision(8) \
+      << std::left << std::setw(4) << oss.str()
+      << std::right << std::setw(20) << r[0] \
+      << std::right << std::setw(20) << r[1] \
+      << std::right << std::setw(20) << r[2] \
+      << std::right << comment;
+  return oss.str();
+}
+
 std::string Atom::write_cq(int spec_int, std::string cx, 
                      std::string cy, std::string cz)
 {

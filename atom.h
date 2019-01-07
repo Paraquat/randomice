@@ -32,6 +32,7 @@ class Atom {
     friend std::ostream& operator<< (std::ostream&, Atom&);
     friend std::ofstream& operator<< (std::ofstream&, Atom&);
     std::string write_cq(int, std::string, std::string, std::string);
+    std::string write_cell();
     bool operator== (const Atom&);
 
     void move(Eigen::Vector3d);
