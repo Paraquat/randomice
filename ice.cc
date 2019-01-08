@@ -18,11 +18,90 @@ Ice::Ice(Cell& cell)
   natoms = cell.natoms;
   frac = cell.frac; 
   scdim = cell.scdim;
+  ghost_method = false;
 }
 
-// Generate a axbxc supercell
+// Given a cell object containing hydrogens, construct and ice object
+void Ice::read_h_pos(Cell& cell)
+{
+  ghost_method = false;
+  lat = cell.lat;
+  lat_inv = lat.inverse();
+  frac = cell.frac; 
+  assert(frac == true);
+
+  // Add the oxygen atoms
+  for (int i=1; i<cell.natoms; i++){
+    if (cell.atoms[i].name == "O"){
+      add_atom(cell.atoms[i]);
+    }
+  }
+  if (natoms < 20) ghost_method = true;
+  get_h_pos();
+  get_waters();
+  cart2frac_all();
+  wrap();
+
+  Eigen::Vector3d s;
+  double d;
+  double thresh = 0.2;
+  int nH = 0;
+  for (int i=0; i<cell.natoms; i++){
+    if (cell.atoms[i].name == "H"){
+      for (int j=0; j<natoms; j++){
+        if (atoms[j].name == "H"){
+          s = mic_frac(cell.atoms[i], atoms[j]);
+          d = s.norm();
+          if (d <= thresh){
+            atoms[j].occupied = true;
+            nH++;
+          }
+        }
+      }
+    }
+  }
+}
+
+// Generate a axbxc supercell from an *ordered* unit cell
 Ice Ice::super(int a, int b, int c)
 {
+  Eigen::Vector3d t, rt;
+  Eigen::Matrix3d lat_super;
+
+  assert(frac == true);
+  lat_super.row(0) = lat.row(0)*static_cast<double>(a);
+  lat_super.row(1) = lat.row(1)*static_cast<double>(b);
+  lat_super.row(2) = lat.row(2)*static_cast<double>(c);
+  Cell sc(lat_super);
+  sc.lat_inv = sc.lat.inverse();
+
+  scdim << static_cast<double>(a), static_cast<double>(b), \
+           static_cast<double>(c);
+  int label = 1;
+  for (int i=0; i<a; i++){
+    for (int j=0; j<b; j++){
+      for (int k=0; k<c; k++){
+        t << static_cast<double>(i), static_cast<double>(j), \
+             static_cast<double>(k);
+
+        for (int n=0; n<natoms; n++){
+          rt = atoms[n].r + t;
+          for (int m=0; m<=2; m++){
+            rt(m) = rt(m)/scdim(m);
+          }
+          Atom a(atoms[n].name, label, rt);
+          a.occupied = atoms[n].occupied;
+          sc.add_atom(a);
+          label += 1;
+        }
+      }
+    }
+  }
+  Ice ice_sc(sc);
+  ice_sc.get_waters();
+  std::string fname = "test.cell";
+  ice_sc.write_cell(fname);
+  return ice_sc; 
 }
 
 // Compute all hydrogen positions for a given oxygen lattice
@@ -35,17 +114,36 @@ void Ice::get_h_pos(void)
   std::deque<Atom> hlist;
 
   if (frac == true) frac2cart_all();
+  // if (frac == false) cart2frac_all();
 
-  get_dt();
-  for (int i=0; i<natoms; i++){
-    for (int j=0; j<natoms; j++){
-      if (i != j){
-      if (dt(i,j) < oo_max){
-        oo = mic_cart(atoms[i], atoms[j]);
-        r_h = atoms[i].r + oh_default*oo.normalized();
-        Atom h = Atom(species, natoms+1, r_h, occ);
-        hlist.push_back(h);
+  std::cout << "ghost method " << ghost_method << std::endl;
+  if (ghost_method){
+    get_ghosts(); 
+    for (int i=0; i<natoms; i++){
+      for (int j=0; j<nghosts; j++){
+        if (atoms[i].label != ghosts[j].label){
+          oo = ghosts[j].r - atoms[i].r;
+          if (oo.norm() < oo_max){
+            r_h = atoms[i].r + oh_default*oo.normalized();
+            Atom h = Atom(species, natoms+1, r_h, occ);
+            hlist.push_back(h);
+          }
+        }
       }
+    }
+  } else {
+    get_dt();
+    std::cout << dt << std::endl;
+    for (int i=0; i<natoms; i++){
+      for (int j=0; j<natoms; j++){
+        if (i != j){
+          if (dt(i,j) < oo_max){
+            oo = mic_cart(atoms[i], atoms[j]);
+            r_h = atoms[i].r + oh_default*oo.normalized();
+            Atom h = Atom(species, natoms+1, r_h, occ);
+            hlist.push_back(h);
+          }
+        }
       }
     }
   }
@@ -71,14 +169,21 @@ void Ice::add_hbond(Hbond& h)
 void Ice::get_waters(void)
 {
   std::cout << "Finding water molecules" << std::endl;
-  get_dt();
+
+  if (!ghost_method) get_dt();
+  double d;
   for (int i=0; i<natoms; i++){
     if (atoms[i].name == "O"){
       int io = i;
       int ih1, ih2, ih3, ih4;
       int hcount = 0;
       for (int j=0; j<natoms; j++){
-        if (dt(i,j) < oh_max){
+        if (ghost_method){
+          d = (atoms[i].r - atoms[j].r).norm();
+        } else{
+          d = dt(i,j);
+        }
+        if (d < oh_max){
           if (atoms[j].name == "H"){
             hcount++;
             if (hcount == 1) ih1 = j;
@@ -809,7 +914,8 @@ void Ice::build_ordered_slab(double dhkl, int direction, double target_cOH, int 
 // Construct a step: compute which atoms to remove, and move them to 
 // the bottom of the file
 void Ice::build_step(std::string direction, double step_width, 
-                     double vacuum_gap, std::string fname)
+                     double vacuum_gap, bool oneside, 
+                     std::string fname)
 {
   int dir = 0;
   std::string t = "T";
@@ -839,8 +945,9 @@ void Ice::build_step(std::string direction, double step_width,
 
   bound1 = bound_incr;
   bound2 = lat(dir,dir) - bound_incr;
+  boost::format fmt("%03d");
   for (int i=0; i<nwater; i++){
-    if (waters[i].bilayer == 1 or waters[i].bilayer == nbilayer) {
+    if (waters[i].bilayer == nbilayer) {
       std::string tag = " # step ";
       iO = waters[i].O;
       iH1 = waters[i].H1;
@@ -848,7 +955,9 @@ void Ice::build_step(std::string direction, double step_width,
       iH3 = waters[i].H3;
       iH4 = waters[i].H4;
       layer = ceil(atoms[iO].r(dir)/binwidth);
-      tag += std::to_string(layer);
+      fmt%layer;
+      tag += fmt.str();
+      // tag += std::to_string(layer);
       atoms[iO].comment = tag;
       atoms[iH1].comment = tag;
       atoms[iH2].comment = tag;
@@ -868,6 +977,23 @@ void Ice::build_step(std::string direction, double step_width,
       //   atoms[iH4].comment = tag;
       //   nstep -= 3;
       // }
+    } 
+    if (!oneside){
+      if (waters[i].bilayer == 1) {
+        std::string tag = " # step ";
+        iO = waters[i].O;
+        iH1 = waters[i].H1;
+        iH2 = waters[i].H2;
+        iH3 = waters[i].H3;
+        iH4 = waters[i].H4;
+        layer = ceil(atoms[iO].r(dir)/binwidth);
+        tag += std::to_string(layer);
+        atoms[iO].comment = tag;
+        atoms[iH1].comment = tag;
+        atoms[iH2].comment = tag;
+        atoms[iH3].comment = tag;
+        atoms[iH4].comment = tag;
+      }
     }
   }
   // for (int i=0; i<nwater; i++){

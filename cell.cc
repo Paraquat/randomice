@@ -349,6 +349,33 @@ Eigen::Vector3d Cell::mic_frac(Atom& a, Atom& b)
   return lat*d;
 }
 
+// Get positions of ghost atoms
+void Cell::get_ghosts(void)
+{
+  if (frac) cart2frac_all();
+  bool occ = false;
+  nghosts = 0;
+  Eigen::Vector3d trans, pos;
+  int l;
+  std::string s;
+  for (int i=-1; i<=1; i++){
+    for (int j=-1; j<=1; j++){
+      for (int k=-1; k<=1; k++){
+        trans << static_cast<double>(i), static_cast<double>(j), \
+                 static_cast<double>(k);
+        trans = lat*trans;
+        for (int a=0; a<natoms; a++){
+          pos = atoms[a].r + trans;
+          s = atoms[a].name;
+          l = atoms[a].label;
+          ghosts.push_back(Atom(s, l, pos, occ));
+          nghosts++;
+        }
+      }
+    }
+  }
+}
+
 // Compute the distance table
 void  Cell::get_dt(void)
 {
@@ -393,6 +420,7 @@ Cell Cell::super(int a, int b, int c)
             rt(m) = rt(m)/scdim(m);
           }
           Atom a(atoms[n].name, label, rt);
+          a.occupied = atoms[n].occupied;
           sc.add_atom(a);
           label += 1;
         }

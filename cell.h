@@ -8,7 +8,8 @@ class Cell {
   private:
   protected:
     Eigen::MatrixXd dt;
-    Eigen::Matrix3d lat_inv;
+    std::deque<Atom> ghosts;
+    int nghosts;
 
     void wrap(void);
     void frac2cart(Atom&);
@@ -18,13 +19,14 @@ class Cell {
     Eigen::Vector3d mic_cart(Atom&, Atom&);
     Eigen::Vector3d mic_frac(Atom&, Atom&);
     Atom& get_atom(int);
+    void get_ghosts(void);
     void get_dt(void);
     void get_nn(double);
     bool isPointOnLine(Atom&, Atom&, Atom&);
   public:
     std::string name;
     int natoms;
-    Eigen::Matrix3d lat;
+    Eigen::Matrix3d lat, lat_inv;
     std::deque<Atom> atoms;
     bool frac;
     bool flag_debug;

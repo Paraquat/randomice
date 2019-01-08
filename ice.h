@@ -4,6 +4,7 @@
 #include <vector>
 #include <gsl/gsl_rng.h>
 #include <boost/progress.hpp>
+#include <boost/format.hpp>
 
 struct Node {
     int water;
@@ -24,6 +25,7 @@ struct Node {
 class Ice: public Cell {
   private:
     gsl_rng *rp;
+    bool ghost_method;
   public:
     std::deque<Water> waters;
     std::deque<Hbond> hbonds;
@@ -35,6 +37,7 @@ class Ice: public Cell {
     virtual ~Ice();
     Ice(Cell&);
 
+    void read_h_pos(Cell&);
     Ice super(int, int, int);
     void get_h_pos(void);
     void add_water(Water&);
@@ -69,7 +72,7 @@ class Ice: public Cell {
     std::deque<int> find_dOH(int);
     double order_parameter(double);
     void build_ordered_slab(double, int, double, int);
-    void build_step(std::string, double, double, std::string);
+    void build_step(std::string, double, double, bool, std::string);
 
     void write_cell(std::string);
     void write_chunk_cell(std::string, std::deque<int>);

@@ -11,6 +11,7 @@ int main(int argc, char* argv[]){
   int maxiter = 1000;
   bool cq_out = false;
   bool ordered = false;
+  bool oneside = false;
   bool castep_out = false;
   bool vasp_out = false;
   bool flag_debug = false;
@@ -25,6 +26,7 @@ int main(int argc, char* argv[]){
      "Maximum number of Rick algorithm iterations")
     ("cq", po::bool_switch(&cq_out), "Write to Conquest file")
     ("ordered,o", po::bool_switch(&ordered), "Generate an ordered supercell")
+    ("oneside", po::bool_switch(&oneside), "Build step on only one side of slab")
     ("cell", po::bool_switch(&castep_out), "Write to CASTEP cell file")
     ("vasp", po::bool_switch(&vasp_out), "Write to VASP POSCAR file")
     ("step", po::bool_switch(&step), "Construct a step")
@@ -70,7 +72,7 @@ int main(int argc, char* argv[]){
   double step_width = 0.0;
   double vacuum_gap = 0.0;
   std::string step_direction = "a";
-  if (vm.count("step")){
+  if (step){
     build_step = true;
     if (vm["step_width"].empty()){
       step_width = 0.0;
@@ -82,50 +84,57 @@ int main(int argc, char* argv[]){
   }
 
   Cell cell;
-  Cell sc;
 
   cell.read_cell(infname);
   double dhkl = cell.lat(2,2)/2.0;
-  sc = cell.super(scx, scy, scz);
-  Ice ice(sc);
-  if (flag_debug) ice.flag_debug = true;
-  else ice.flag_debug = false;
-  ice.get_h_pos();
-  ice.get_waters();
-  ice.get_hbonds();
+  Ice ice;
+  if (ordered){
+    Ice unit;
+    unit.read_h_pos(cell);
+    ice = unit.super(scx, scy, scz);
+    ice.build_slab(dhkl, 2);
 
-  std::cout << ice.nwater << " waters" << std::endl;
-  std::cout << ice.nhbond << " hydrogen bonds" << std::endl;
-  ice.populate_h_random();
-  ice.buch_mc_correct();
-  // ice.write_cell("init.cell");
-  int nionic = ice.check_ionic_defects();
-  int nbjerrum = ice.check_bjerrum_defects();
-  if (nionic != 0){
-    std::cout << "WARNING: " << nionic << " ionic defects" << std::endl;
+  } else{
+    Cell sc;
+    sc = cell.super(scx, scy, scz);
+    Ice ice(sc);
+    if (flag_debug) ice.flag_debug = true;
+    else ice.flag_debug = false;
+    ice.get_h_pos();
+    ice.get_waters();
+    ice.get_hbonds();
+
+    std::cout << ice.nwater << " waters" << std::endl;
+    std::cout << ice.nhbond << " hydrogen bonds" << std::endl;
+    ice.populate_h_random();
+    ice.buch_mc_correct();
+    // ice.write_cell("init.cell");
+    int nionic = ice.check_ionic_defects();
+    int nbjerrum = ice.check_bjerrum_defects();
+    if (nionic != 0){
+      std::cout << "WARNING: " << nionic << " ionic defects" << std::endl;
+    }
+    if (nbjerrum != 0){
+      std::cout << "WARNING: " << nbjerrum << " Bjerrum defects" << std::endl;
+    }
+    ice.build_ordered_slab(dhkl, 2, 2.0, maxiter);
+    nionic = ice.check_ionic_defects();
+    nbjerrum = ice.check_bjerrum_defects();
+    if (nionic != 0){
+      std::cout << "WARNING: " << nionic << " ionic defects" << std::endl;
+    }
+    if (nbjerrum != 0){
+      std::cout << "WARNING: " << nbjerrum << " Bjerrum defects" << std::endl;
+    }
   }
-  if (nbjerrum != 0){
-    std::cout << "WARNING: " << nbjerrum << " Bjerrum defects" << std::endl;
-  }
-  ice.build_ordered_slab(dhkl, 2, 2.0, maxiter);
-  nionic = ice.check_ionic_defects();
-  nbjerrum = ice.check_bjerrum_defects();
-  if (nionic != 0){
-    std::cout << "WARNING: " << nionic << " ionic defects" << std::endl;
-  }
-  if (nbjerrum != 0){
-    std::cout << "WARNING: " << nbjerrum << " Bjerrum defects" << std::endl;
-  }
-  // ice.rick_randomise(100000);
-  // std::cout << "Randomisation complete";
-  // ice.build_slab(dhkl_default, 2);
+
   if (build_step) {
     if (phase == "Ih"){
       ice.xlayers = 2*scx;
       ice.ylayers = 2*scy;    
     }
     std::string fname = "ice";
-    ice.build_step(step_direction, step_width, vacuum_gap, fname);
+    ice.build_step(step_direction, step_width, vacuum_gap, oneside, fname);
   } else{
     std::deque<int> slist;
     for (int i=0; i<ice.s1list.size(); i++) slist.push_back(ice.s1list[i]);
