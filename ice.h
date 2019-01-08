@@ -1,25 +1,48 @@
 #include "cell.h"
 #include "water.h"
 #include "hbond.h"
+#include <vector>
 #include <gsl/gsl_rng.h>
+#include <boost/progress.hpp>
+#include <boost/format.hpp>
+
+struct Node {
+    int water;
+    int hbond;
+
+    Node(){};
+    virtual ~Node(){}; 
+    Node(int w, int h){
+        water = w;
+        hbond = h;
+    }
+    Node(const Node& n){
+        water = n.water;
+        hbond = n.hbond;
+    }
+};
 
 class Ice: public Cell {
   private:
-    gsl_rng *r;
+    gsl_rng *rp;
+    bool ghost_method;
   public:
     std::deque<Water> waters;
     std::deque<Hbond> hbonds;
-    int nwater, nhbond;
+    std::deque<int> s1list, s2list;
+    int nwater, nhbond, nbilayer, noccupied;
+    int xlayers, ylayers, zlayers;
 
     Ice();
     virtual ~Ice();
     Ice(Cell&);
 
+    void read_h_pos(Cell&);
+    Ice super(int, int, int);
     void get_h_pos(void);
     void add_water(Water&);
     void add_hbond(Hbond&);
     void get_waters(void);
-    void get_water_nn(double);
     void get_hbonds(void);
     void print_ice(void);
 
@@ -27,8 +50,34 @@ class Ice: public Cell {
     int rng_int(int);
     double rng_uniform(void);
     void populate_h_random(void);
+    int water_coord(int);
+    int hbond_occ(int);
     int o_two_coordinated(void);
+    void swap_h(int);
     void buch_mc_correct(void);
+    int hb_target(int);
+
+    std::vector<bool> save_config(void);
+    void revert_config(std::vector<bool>);
+    std::deque<Node> get_loop(int);
+    void rick_move(int);
+    void rick_randomise(int);
+
+    int check_ionic_defects(void);
+    int check_bjerrum_defects(void);
+    Eigen::Vector3d water_dipole(int);
+    double c1_dipole(void);
+
+    void build_slab(double, int);
+    std::deque<int> find_dOH(int);
+    double order_parameter(double);
+    void build_ordered_slab(double, int, double, int);
+    void build_step(std::string, double, double, bool, std::string);
 
     void write_cell(std::string);
+    void write_chunk_cell(std::string, std::deque<int>);
+    void write_highlight_cell(std::string, std::deque<int>);
+    void print_water(int);
+    void print_hbond(int);
+    void print_network(void);
 };

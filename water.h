@@ -4,33 +4,27 @@
 #define WATER_H
 
 class Hbond;
-typedef std::shared_ptr<Hbond> hbond_ptr;
 
 class Water {
   private:
-    int nH;
   protected:
   public:
-    Atom::atom_ptr O, H1, H2, H3, H4;
+    int O, H1, H2, H3, H4, bilayer;
     std::string ionic;
-    int label;
-    typedef std::shared_ptr<Water> water_ptr;
-    std::deque<water_ptr> nn;
-    std::deque<hbond_ptr> hbonds;
+    std::deque<int> hbonds;
+    bool surface1, surface2; // is the molecule on either surface?
+    bool remove;             // remove this molecule to make a step?
+    bool dOH;                // does the molecule have a dangling H?
+    int step;                // label for step
 
     Water();
     virtual ~Water();
     Water(const Water&);
     Water& operator= (const Water&);
     bool operator== (const Water&);
-    Water(int, Atom::atom_ptr, Atom::atom_ptr, Atom::atom_ptr, Atom::atom_ptr, Atom::atom_ptr);
+    Water(int, int, int, int, int);
 
-    friend std::ostream& operator<< (std::ostream&, Water&);
-    friend std::ofstream& operator<< (std::ofstream&, Water&);
-    void add_nn(water_ptr);
-    void add_hbond(hbond_ptr);
-    void check_defect(void);
-    int coord(void);
+    void add_hbond(int);
 };
 
 #endif  // WATER_H

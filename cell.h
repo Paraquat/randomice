@@ -1,5 +1,4 @@
 #include "atom.h"
-#include "constants.h"
 #include <algorithm>
 #include <regex>
 #include <Eigen/LU>     // required for matrix.inverse()
@@ -9,7 +8,8 @@ class Cell {
   private:
   protected:
     Eigen::MatrixXd dt;
-    Eigen::Matrix3d lat_inv;
+    std::deque<Atom> ghosts;
+    int nghosts;
 
     void wrap(void);
     void frac2cart(Atom&);
@@ -18,15 +18,19 @@ class Cell {
     void cart2frac_all(void);
     Eigen::Vector3d mic_cart(Atom&, Atom&);
     Eigen::Vector3d mic_frac(Atom&, Atom&);
+    Atom& get_atom(int);
+    void get_ghosts(void);
     void get_dt(void);
     void get_nn(double);
     bool isPointOnLine(Atom&, Atom&, Atom&);
   public:
     std::string name;
     int natoms;
-    Eigen::Matrix3d lat;
+    Eigen::Matrix3d lat, lat_inv;
     std::deque<Atom> atoms;
     bool frac;
+    bool flag_debug;
+    Eigen::Vector3d scdim;
 
     Cell();
     virtual ~Cell();
@@ -41,5 +45,9 @@ class Cell {
     void add_atom(Atom&);
     void read_cell(std::string);
     virtual void write_cell(std::string);
+    virtual void write_cq(std::string);
+    virtual void write_vasp(std::string);
+    void write_xyz(std::string, std::string);
     Cell super(int, int, int);
+    void shift(double, double, double);
 };

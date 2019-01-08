@@ -48,6 +48,12 @@ Cell& Cell::operator= (const Cell& cell)
   return *this;
 }
 
+// Atom getter
+Atom& Cell::get_atom(int ia)
+{
+  return atoms.at(ia);
+}
+
 // Write to ostream
 std::ostream& operator<< (std::ostream& os, Cell& cell)
 {
@@ -146,8 +152,8 @@ void Cell::write_cell(std::string fname)
 
   outfile << "%BLOCK lattice_cart" << std::endl;
   for (int i=0; i<=2; i++) {
-    outfile << std::fixed << std::setprecision(8) \
-            << lat.row(i) << std::endl;
+    outfile << std::fixed << std::setprecision(8)
+            << std::right << std::setw(20) << lat.row(i) << std::endl;
   }
   outfile << "%ENDBLOCK lattice_cart" << std::endl << std::endl;
   if (frac) outfile << "%BLOCK positions_frac" << std::endl;
@@ -163,11 +169,116 @@ void Cell::write_cell(std::string fname)
   else outfile << "%ENDBLOCK positions_abs" << std::endl << std::endl;
 }
 
+// Write object to a Conquest coord file
+void Cell::write_cq(std::string fname)
+{
+  std::ofstream     outfile(fname.c_str());
+
+  if (!frac) cart2frac_all();
+
+  if (outfile.fail()) {
+    std::cout << "Error opening file " << fname << std::endl;
+  }
+  for (int i=0; i<=2; i++) {
+    outfile << std::fixed << std::setprecision(8) \
+            << lat.row(i)*ang2bohr << std::endl;
+  }
+  outfile << natoms << std::endl;
+
+  for (int i=0; i<natoms; i++) {
+    if (atoms[i].occupied){
+      outfile << std::fixed << std::setprecision(8) 
+              << std::right << std::setw(20) << atoms[i].r[0]
+              << std::right << std::setw(20) << atoms[i].r[1]
+              << std::right << std::setw(20) << atoms[i].r[2]
+              << std::right << std::setw(4) << atoms[i].name 
+              << " T T T" << std::endl;
+    }
+  }
+}
+
+// Write object to a VASP POSCAR file
+void Cell::write_vasp(std::string fname)
+{
+  std::ofstream     outfile(fname.c_str());
+  std::vector<int>  species_count;
+  std::vector<std::string> species;
+  bool              found;
+  int               nspec, spec_ind;
+
+  nspec = 0;
+  for (int i=0; i<natoms; i++){
+    if (atoms[i].occupied){
+      found = false;
+      for (int j=0; j<nspec; j++){
+        if (atoms[i].name == species[j]){
+          found = true;
+          spec_ind = j;
+          break;
+        }
+      }
+      if (!found){
+        species.push_back(atoms[i].name);
+        species_count.push_back(1);
+        nspec++;
+      } else {
+        species_count[spec_ind]++;
+      }
+    }
+  }
+
+  if (!frac) cart2frac_all();
+
+  if (outfile.fail()) {
+    std::cout << "Error opening file " << fname << std::endl;
+  }
+
+  outfile << std::endl;
+  outfile << std::fixed << std::setprecision(4) << 1.0 << std::endl;
+  for (int i=0; i<=2; i++) {
+    outfile << std::fixed << std::right << std::setprecision(8)
+            << lat.row(i) << std::endl;
+  }
+
+  for (int i=0; i<nspec; i++) outfile << std::setw(6) << species[i];
+  outfile << std::endl;
+  for (int i=0; i<nspec; i++) outfile << std::setw(6) << species_count[i];
+  outfile << std::endl << "Direct" << std::endl;
+
+  for (int i=0; i<natoms; i++) {
+    if (atoms[i].occupied){
+      outfile << std::fixed << std::setprecision(8) 
+              << std::right << std::setw(20) << atoms[i].r[0]
+              << std::right << std::setw(20) << atoms[i].r[1]
+              << std::right << std::setw(20) << atoms[i].r[2] << std::endl;
+    }
+  }
+}
+
+// Write object to a .xyz file
+void Cell::write_xyz(std::string fname, std::string comment)
+{
+  std::ofstream     outfile(fname.c_str());
+
+  if (outfile.fail()) {
+    std::cout << "Error opening file " << fname << std::endl;
+  }
+
+  outfile << natoms << std::endl;
+  outfile << comment << std::endl;
+  if (frac) frac2cart_all();
+  for (int i=0; i<natoms; i++) {
+    if (atoms[i].occupied){
+      outfile << atoms[i] << std::endl;
+    }
+  }
+}
+
 // Wrap the atoms back into the unit cell if necessary
 void Cell::wrap(void)
 {
   std::cout << "Wrapping atoms into unit cell" << std::endl;
-  assert(frac == true);
+  if (frac == false) cart2frac_all();
   for (int i=0; i<natoms; i++) {
     for (int j=0; j<=2; j++) {
       while (1) {
@@ -189,7 +300,6 @@ void Cell::frac2cart(Atom& a)
 void Cell::frac2cart_all(void)
 {
   std::cout << "Converting coordinates from fractional to Cartesian" << std::endl;
-  wrap();
   for (int i=0; i<natoms; i++) {
     frac2cart(atoms[i]);
   }  
@@ -210,7 +320,6 @@ void Cell::cart2frac_all(void)
     cart2frac(atoms[i]);
   }  
   frac = true;
-  wrap();
 }
 
 // Compute the vector between two atoms with PBCs using the Minimum Image
@@ -240,6 +349,33 @@ Eigen::Vector3d Cell::mic_frac(Atom& a, Atom& b)
   return lat*d;
 }
 
+// Get positions of ghost atoms
+void Cell::get_ghosts(void)
+{
+  if (frac) cart2frac_all();
+  bool occ = false;
+  nghosts = 0;
+  Eigen::Vector3d trans, pos;
+  int l;
+  std::string s;
+  for (int i=-1; i<=1; i++){
+    for (int j=-1; j<=1; j++){
+      for (int k=-1; k<=1; k++){
+        trans << static_cast<double>(i), static_cast<double>(j), \
+                 static_cast<double>(k);
+        trans = lat*trans;
+        for (int a=0; a<natoms; a++){
+          pos = atoms[a].r + trans;
+          s = atoms[a].name;
+          l = atoms[a].label;
+          ghosts.push_back(Atom(s, l, pos, occ));
+          nghosts++;
+        }
+      }
+    }
+  }
+}
+
 // Compute the distance table
 void  Cell::get_dt(void)
 {
@@ -259,7 +395,7 @@ void  Cell::get_dt(void)
 // Generate a axbxc supercell
 Cell Cell::super(int a, int b, int c)
 {
-  Eigen::Vector3d t, rt, scdim;
+  Eigen::Vector3d t, rt;
   Eigen::Matrix3d lat_super;
 
   assert(frac == true);
@@ -267,6 +403,7 @@ Cell Cell::super(int a, int b, int c)
   lat_super.row(1) = lat.row(1)*static_cast<double>(b);
   lat_super.row(2) = lat.row(2)*static_cast<double>(c);
   Cell sc(lat_super);
+  sc.lat_inv = sc.lat.inverse();
 
   scdim << static_cast<double>(a), static_cast<double>(b), \
            static_cast<double>(c);
@@ -283,6 +420,7 @@ Cell Cell::super(int a, int b, int c)
             rt(m) = rt(m)/scdim(m);
           }
           Atom a(atoms[n].name, label, rt);
+          a.occupied = atoms[n].occupied;
           sc.add_atom(a);
           label += 1;
         }
@@ -332,4 +470,17 @@ bool Cell::isPointOnLine(Atom& a, Atom& b, Atom& c)
     }
   }
   return on_line;
+}
+
+// Shift all atomic coordinates by a constant
+void Cell::shift(double xs, double ys, double zs)
+{
+  Eigen::Vector3d sh;
+  sh << xs, ys, zs;
+  if (frac) frac2cart_all();
+  for (int i=0; i<natoms; i++){
+    atoms[i].move(sh);
+  }
+  wrap();
+  frac2cart_all();
 }
