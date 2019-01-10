@@ -26,6 +26,7 @@ class Ice: public Cell {
   private:
     gsl_rng *rp;
     bool ghost_method;
+    double oh_bond_length;
   public:
     std::deque<Water> waters;
     std::deque<Hbond> hbonds;
@@ -37,6 +38,7 @@ class Ice: public Cell {
     virtual ~Ice();
     Ice(Cell&);
 
+    void set_oh_length(double);
     void read_h_pos(Cell&);
     Ice super(int, int, int);
     void get_h_pos(void);

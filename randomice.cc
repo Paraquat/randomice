@@ -16,6 +16,7 @@ int main(int argc, char* argv[]){
   bool vasp_out = false;
   bool flag_debug = false;
   bool step = false;
+  double oh = oh_default;
 
   desc.add_options()
     ("help,h", "Print help information")
@@ -31,6 +32,7 @@ int main(int argc, char* argv[]){
     ("vasp", po::bool_switch(&vasp_out), "Write to VASP POSCAR file")
     ("step", po::bool_switch(&step), "Construct a step")
     ("step_direction", po::value< std::string >(), "Direction of step (a,b,c)")
+    ("OH", po::value< double >(), "OH bond length")
     ("step_width", po::value< double >(), "Width of step (a0)")
     ("vacuum_gap", po::value< double >(), "Size of vacuum gap (a0)")
     ("supercell,s", po::value<std::vector<int> >() -> multitoken(), 
@@ -67,6 +69,9 @@ int main(int argc, char* argv[]){
   if (vm.count("maxiter")){
     maxiter = vm["maxiter"].as<int>();
   }
+  if (vm.count("OH")){
+    oh = vm["OH"].as<double>();
+  }
 
   bool build_step = false;
   double step_width = 0.0;
@@ -90,7 +95,9 @@ int main(int argc, char* argv[]){
   Ice ice;
   if (ordered){
     Ice unit;
+    unit.set_oh_length(oh);
     unit.read_h_pos(cell);
+    ice.set_oh_length(oh);
     ice = unit.super(scx, scy, scz);
     ice.build_slab(dhkl, 2);
 
@@ -100,6 +107,7 @@ int main(int argc, char* argv[]){
     Ice ice(sc);
     if (flag_debug) ice.flag_debug = true;
     else ice.flag_debug = false;
+    ice.set_oh_length(oh);
     ice.get_h_pos();
     ice.get_waters();
     ice.get_hbonds();

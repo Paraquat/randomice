@@ -21,6 +21,12 @@ Ice::Ice(Cell& cell)
   ghost_method = false;
 }
 
+// set the OH bond length
+void Ice::set_oh_length(double oh)
+{
+  oh_bond_length = oh;
+}
+
 // Given a cell object containing hydrogens, construct and ice object
 void Ice::read_h_pos(Cell& cell)
 {
@@ -124,7 +130,7 @@ void Ice::get_h_pos(void)
         if (atoms[i].label != ghosts[j].label){
           oo = ghosts[j].r - atoms[i].r;
           if (oo.norm() < oo_max){
-            r_h = atoms[i].r + oh_default*oo.normalized();
+            r_h = atoms[i].r + oh_bond_length*oo.normalized();
             Atom h = Atom(species, natoms+1, r_h, occ);
             hlist.push_back(h);
           }
@@ -139,7 +145,7 @@ void Ice::get_h_pos(void)
         if (i != j){
           if (dt(i,j) < oo_max){
             oo = mic_cart(atoms[i], atoms[j]);
-            r_h = atoms[i].r + oh_default*oo.normalized();
+            r_h = atoms[i].r + oh_bond_length*oo.normalized();
             Atom h = Atom(species, natoms+1, r_h, occ);
             hlist.push_back(h);
           }
@@ -940,8 +946,6 @@ void Ice::build_step(std::string direction, double step_width,
   } else if (dir == 1) {
     binwidth = lat(dir,dir)/static_cast<double>(ylayers);
   }
-  // std:: cout << "bound1 " << bound1 << std:: endl;
-  // std:: cout << "bound2 " << bound2 << std:: endl;
 
   bound1 = bound_incr;
   bound2 = lat(dir,dir) - bound_incr;
@@ -963,20 +967,13 @@ void Ice::build_step(std::string direction, double step_width,
       atoms[iH2].comment = tag;
       atoms[iH3].comment = tag;
       atoms[iH4].comment = tag;
+      // atoms[iO].remove = true;
+      // atoms[iH1].remove = true;
+      // atoms[iH2].remove = true;
+      // atoms[iH3].remove = true;
+      // atoms[iH4].remove = true;
+      // nstep -= 3;
 
-      // if (atoms[iO].r[dir] < bound1 or atoms[iO].r[dir] > bound2){
-      //   atoms[iO].remove = true;
-      //   atoms[iO].comment = tag;
-      //   atoms[iH1].remove = true;
-      //   atoms[iH1].comment = tag;
-      //   atoms[iH2].remove = true;
-      //   atoms[iH2].comment = tag;
-      //   atoms[iH3].remove = true;
-      //   atoms[iH3].comment = tag;
-      //   atoms[iH4].remove = true;
-      //   atoms[iH4].comment = tag;
-      //   nstep -= 3;
-      // }
     } 
     if (!oneside){
       if (waters[i].bilayer == 1) {
@@ -993,31 +990,15 @@ void Ice::build_step(std::string direction, double step_width,
         atoms[iH2].comment = tag;
         atoms[iH3].comment = tag;
         atoms[iH4].comment = tag;
+  //       atoms[iO].remove = true;
+  //       atoms[iH1].remove = true;
+  //       atoms[iH2].remove = true;
+  //       atoms[iH3].remove = true;
+  //       atoms[iH4].remove = true;
+  //       nstep -= 3;
       }
     }
   }
-  // for (int i=0; i<nwater; i++){
-  //   if (waters[i].bilayer == 1 or waters[i].bilayer == nbilayer) {
-  //     iO = waters[i].O;
-  //     iH1 = waters[i].H1;
-  //     iH2 = waters[i].H2;
-  //     iH3 = waters[i].H3;
-  //     iH4 = waters[i].H4;
-  //     if (atoms[iO].r[dir] < bound1 or atoms[iO].r[dir] > bound2){
-  //       atoms[iO].remove = true;
-  //       atoms[iO].comment = tag;
-  //       atoms[iH1].remove = true;
-  //       atoms[iH1].comment = tag;
-  //       atoms[iH2].remove = true;
-  //       atoms[iH2].comment = tag;
-  //       atoms[iH3].remove = true;
-  //       atoms[iH3].comment = tag;
-  //       atoms[iH4].remove = true;
-  //       atoms[iH4].comment = tag;
-  //       nstep -= 3;
-  //     }
-  //   }
-  // }
 
   std::string file_bulk = fname + "_bulk.in";
   std::string file_slab = fname + "_slab.in";
