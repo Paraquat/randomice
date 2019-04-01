@@ -13,9 +13,7 @@ class Cell {
 
     void wrap(void);
     void frac2cart(Atom&);
-    void frac2cart_all(void);
     void cart2frac(Atom&);
-    void cart2frac_all(void);
     Eigen::Vector3d mic_cart(Atom&, Atom&);
     Eigen::Vector3d mic_frac(Atom&, Atom&);
     Atom& get_atom(int);
@@ -29,7 +27,6 @@ class Cell {
     Eigen::Matrix3d lat, lat_inv;
     std::deque<Atom> atoms;
     bool frac;
-    bool flag_debug;
     Eigen::Vector3d scdim;
 
     Cell();
@@ -44,9 +41,12 @@ class Cell {
 
     void add_atom(Atom&);
     void read_cell(std::string);
+    void cart2frac_all(void);
+    void frac2cart_all(void);
     virtual void write_cell(std::string);
     virtual void write_cq(std::string);
     virtual void write_vasp(std::string);
+    virtual void write_xsf(std::string, int, bool);
     void write_xyz(std::string, std::string);
     Cell super(int, int, int);
     void shift(double, double, double);

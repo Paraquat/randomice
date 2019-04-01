@@ -87,6 +87,10 @@ void Cell::read_cell(std::string fname)
   int                 label;
   bool                readatoms = false;
 
+  if (flag_debug){
+    std::cout << "Reading cell from " << fname << " (cell)" << std::endl;
+  }
+
   if (!infile){
     std::cout << "Error opening file " << fname << std::endl;
     std::exit(1);
@@ -144,6 +148,10 @@ void Cell::read_cell(std::string fname)
 // Write object to a .cell file
 void Cell::write_cell(std::string fname)
 {
+  if (flag_debug){
+    std::cout << "Writing cell to " << fname << " (cell)" << std::endl;
+  }
+  
   std::ofstream     outfile(fname.c_str());
 
   if (outfile.fail()) {
@@ -206,6 +214,10 @@ void Cell::write_vasp(std::string fname)
   bool              found;
   int               nspec, spec_ind;
 
+  if (flag_debug){
+    std::cout << "Writing cell to " << fname << " (VASP)" << std::endl;
+  }
+
   nspec = 0;
   for (int i=0; i<natoms; i++){
     if (atoms[i].occupied){
@@ -230,7 +242,7 @@ void Cell::write_vasp(std::string fname)
   if (!frac) cart2frac_all();
 
   if (outfile.fail()) {
-    std::cout << "Error opening file " << fname << std::endl;
+    std::cout << "Error opening file " << fname << " (xyz)" << std::endl;
   }
 
   outfile << std::endl;
@@ -255,10 +267,42 @@ void Cell::write_vasp(std::string fname)
   }
 }
 
+// Write object to a .xsf file
+void Cell::write_xsf(std::string fname, int iter, bool append)
+{
+  std::ofstream outfile(fname.c_str(), std::ios_base::app);
+  std::vector<std::string> species;
+
+  if (flag_debug){
+    std::cout << "Writing cell to " << fname << " (xsf)" << std::endl;
+  }
+
+  if (iter==0){
+    outfile << "ANIMSTEP " << std::endl;
+  }
+  outfile << "CRYSTAL" << std::endl;
+  outfile << "PRIMVEC   " << iter << std::endl;
+  for (int i=0; i<=2; i++) {
+    outfile << std::fixed << std::right << std::setprecision(8)
+            << lat.row(i) << std::endl;
+  }
+  outfile << "PRIMCOORD " << iter << std::endl;
+  outfile << natoms << " 1" << std::endl;
+  for (int i=0; i<natoms; i++) {
+    if (atoms[i].occupied){
+      outfile << atoms[i] << std::endl;
+    }
+  }
+}
+
 // Write object to a .xyz file
 void Cell::write_xyz(std::string fname, std::string comment)
 {
   std::ofstream     outfile(fname.c_str());
+
+  if (flag_debug){
+    std::cout << "Writing cell to " << fname << std::endl;
+  }
 
   if (outfile.fail()) {
     std::cout << "Error opening file " << fname << std::endl;
@@ -277,7 +321,7 @@ void Cell::write_xyz(std::string fname, std::string comment)
 // Wrap the atoms back into the unit cell if necessary
 void Cell::wrap(void)
 {
-  std::cout << "Wrapping atoms into unit cell" << std::endl;
+  if (flag_debug) std::cout << "Wrapping atoms into unit cell" << std::endl;
   if (frac == false) cart2frac_all();
   for (int i=0; i<natoms; i++) {
     for (int j=0; j<=2; j++) {
@@ -299,7 +343,9 @@ void Cell::frac2cart(Atom& a)
 // Convert all coordinates from fractional to Cartesian
 void Cell::frac2cart_all(void)
 {
-  std::cout << "Converting coordinates from fractional to Cartesian" << std::endl;
+  if (flag_debug){
+    std::cout << "Converting coordinates from fractional to Cartesian" << std::endl;
+  }
   for (int i=0; i<natoms; i++) {
     frac2cart(atoms[i]);
   }  
@@ -315,7 +361,9 @@ void Cell::cart2frac(Atom& a)
 // Convert all atomic coordinates from Cartesian to fractional
 void Cell::cart2frac_all(void)
 {
-  std::cout << "Converting coordinates from Cartesian to fractional" << std::endl;
+  if (flag_debug){
+    std::cout << "Converting coordinates from Cartesian to fractional" << std::endl;
+  }
   for (int i=0; i<natoms; i++) {
     cart2frac(atoms[i]);
   }  
@@ -379,7 +427,7 @@ void Cell::get_ghosts(void)
 // Compute the distance table
 void  Cell::get_dt(void)
 {
-  std::cout << "Building distance table" << std::endl;
+  if (flag_debug) std::cout << "Building distance table" << std::endl;
   Eigen::Vector3d d;
   dt.setZero(natoms,natoms);
   for (int i=0; i<natoms; i++) {
@@ -397,6 +445,9 @@ Cell Cell::super(int a, int b, int c)
 {
   Eigen::Vector3d t, rt;
   Eigen::Matrix3d lat_super;
+
+  std::cout << "Generating " << a << " x " << b << " x " << c \
+    << " supercell" << std::endl;
 
   assert(frac == true);
   lat_super.row(0) = lat.row(0)*static_cast<double>(a);
@@ -426,6 +477,9 @@ Cell Cell::super(int a, int b, int c)
         }
       }
     }
+  }
+  if (flag_debug){
+    std::cout << sc.natoms << " atoms in supercell" << std::endl;
   }
   return sc;
 }

@@ -1,4 +1,5 @@
 #include "atom.h"
+#include <gsl/gsl_rng.h>
 
 #ifndef WATER_H
 #define WATER_H
@@ -15,6 +16,7 @@ class Water {
     bool surface1, surface2; // is the molecule on either surface?
     bool remove;             // remove this molecule to make a step?
     bool dOH;                // does the molecule have a dangling H?
+    bool fixed;              // whether the molecule can be rotated
     int step;                // label for step
 
     Water();
@@ -25,6 +27,7 @@ class Water {
     Water(int, int, int, int, int);
 
     void add_hbond(int);
+    void fix(void);
 };
 
 #endif  // WATER_H

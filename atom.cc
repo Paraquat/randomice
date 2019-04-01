@@ -102,13 +102,26 @@ std::ofstream& operator<< (std::ofstream& ofs, Atom& a)
   return ofs;
 }
 
+std::string Atom::write_cell_highlight(std::string newname, std::string ref)
+{
+  std::ostringstream oss;
+  std::string spec = name;
+  if (comment == ref) spec = newname;
+  oss << std::fixed << std::setprecision(8) \
+      << std::left << std::setw(4) << spec \
+      << std::right << std::setw(20) << r[0] \
+      << std::right << std::setw(20) << r[1] \
+      << std::right << std::setw(20) << r[2];
+  if (!comment.empty()) oss << std::right << std::setw(20) << comment;
+  return oss.str();
+}
+
 std::string Atom::write_cell(void)
 {
   std::ostringstream oss;
 
-  oss << name;
   oss << std::fixed << std::setprecision(8) \
-      << std::left << std::setw(4) << oss.str()
+      << std::left << std::setw(4) << name \
       << std::right << std::setw(20) << r[0] \
       << std::right << std::setw(20) << r[1] \
       << std::right << std::setw(20) << r[2] \
@@ -142,6 +155,10 @@ void Atom::move(Eigen::Vector3d trans)
 void Atom::occupy(bool occ)
 {
   occupied = occ;
+}
+
+void Atom::toggle_occupied(void){
+  occupied = !occupied;
 }
 
 void Atom::add_nn(atom_ptr n)

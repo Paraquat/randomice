@@ -2,6 +2,7 @@
 
 Water::Water()
 {
+  fixed = false;
 }
 
 Water::~Water()
@@ -15,6 +16,7 @@ Water::Water(const Water& w)
   H2 = w.H2;
   H3 = w.H3;
   H4 = w.H4;
+  fixed = false;
 }
 
 Water& Water::operator= (const Water& w)
@@ -41,9 +43,15 @@ Water::Water(int o, int h1, int h2, int h3, int h4)
   H2 = h2;
   H3 = h3;
   H4 = h4;
+  fixed = false;
 }
 
 void Water::add_hbond(int hb)
 {
   hbonds.push_back(hb);
+}
+
+void Water::fix(void)
+{
+  fixed = true;
 }

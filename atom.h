@@ -1,4 +1,5 @@
 #include "constants.h"
+#include "global.h"
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -17,8 +18,9 @@ class Atom {
     std::string comment;
     Eigen::Vector3d r;
     int label, nneighbour, species;
-    bool occupied;
-    bool remove;
+    bool occupied;  // whether the position is occupied
+    bool remove;    // whether to remove the atom when writing to file
+    bool fixed;     // whether this atom can be made occupied
     typedef std::shared_ptr<Atom> atom_ptr;
     std::deque<atom_ptr> nn;
 
@@ -32,11 +34,13 @@ class Atom {
     friend std::ostream& operator<< (std::ostream&, Atom&);
     friend std::ofstream& operator<< (std::ofstream&, Atom&);
     std::string write_cq(int, std::string, std::string, std::string);
+    std::string write_cell_highlight(std::string, std::string);
     std::string write_cell();
     bool operator== (const Atom&);
 
     void move(Eigen::Vector3d);
     void occupy(bool);
+    void toggle_occupied(void);
     void add_nn(atom_ptr);
     void print_nn(void);
 };

@@ -5,7 +5,7 @@ PROG = randomice
 LIBS = -lboost_program_options -lgsl
 CCFLAGS = 
 LDFLAGS = -std=c++11 -stdlib=libc++
-HEADERS = atom.h water.h hbond.h cell.h ice.h randomice.h constants.h
+HEADERS = atom.h water.h hbond.h cell.h ice.h randomice.h constants.h global.h
 SRCS = atom.cc water.cc hbond.cc cell.cc ice.cc randomice.cc
 OBJS = atom.o water.o hbond.o cell.o ice.o randomice.o
 
@@ -21,9 +21,9 @@ $(PROG): $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LPATH) $(LIBS)
 
 .cc.o:
-	$(CC) -c $< $(LDFLAGS)
+	$(CC) -c $< $(CCFLAGS)
 
-atom.o: atom.h atom.cc
+atom.o: atom.h atom.cc global.h
 water.o: water.h water.cc atom.o
 hbond.o: hbond.h hbond.cc atom.o
 cell.o: atom.o cell.h cell.cc constants.h

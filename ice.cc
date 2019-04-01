@@ -19,6 +19,7 @@ Ice::Ice(Cell& cell)
   frac = cell.frac; 
   scdim = cell.scdim;
   ghost_method = false;
+  nwater = 0;
 }
 
 // set the OH bond length
@@ -118,11 +119,11 @@ void Ice::get_h_pos(void)
   std::string species = "H";
   bool occ = false;
   std::deque<Atom> hlist;
+  int nH = 0;
 
   if (frac == true) frac2cart_all();
   // if (frac == false) cart2frac_all();
 
-  std::cout << "ghost method " << ghost_method << std::endl;
   if (ghost_method){
     get_ghosts(); 
     for (int i=0; i<natoms; i++){
@@ -133,13 +134,13 @@ void Ice::get_h_pos(void)
             r_h = atoms[i].r + oh_bond_length*oo.normalized();
             Atom h = Atom(species, natoms+1, r_h, occ);
             hlist.push_back(h);
+            nH++;
           }
         }
       }
     }
   } else {
     get_dt();
-    std::cout << dt << std::endl;
     for (int i=0; i<natoms; i++){
       for (int j=0; j<natoms; j++){
         if (i != j){
@@ -148,12 +149,14 @@ void Ice::get_h_pos(void)
             r_h = atoms[i].r + oh_bond_length*oo.normalized();
             Atom h = Atom(species, natoms+1, r_h, occ);
             hlist.push_back(h);
+            nH++;
           }
         }
       }
     }
   }
 
+  std::cout << "Found " << nH << " hydrogen positions" << std::endl;
   for (int i=0; i<hlist.size(); i++){
     add_atom(hlist[i]);
   }
@@ -200,12 +203,14 @@ void Ice::get_waters(void)
         } 
       }
       if (hcount != 4){
+        std::cout << hcount << " hydrogens" << std::endl;
         throw std::runtime_error("Did not find 4 hydrogens for this water");
       }
       Water w(io, ih1, ih2, ih3, ih4);
       add_water(w);
     }
   }
+  std::cout << "Found " << nwater << " water molecules" <<std::endl;
 }
 
 void Ice::get_hbonds(void)
@@ -271,7 +276,6 @@ void Ice::get_hbonds(void)
         assert(nh == 2);
         Hbond hb(io1, io2, ih1, ih2, i, j);
         add_hbond(hb);
-
       }
     }
   }
@@ -285,6 +289,29 @@ void Ice::get_hbonds(void)
     }
   }
   for (int i=0; i<nwater; i++) assert(waters[i].hbonds.size() == 4);
+  if (flag_debug){
+    std::cout << "Found " << nhbond << " hydrogen bonds" << std::endl;
+  }
+}
+
+void Ice::init_bulk_random(double oh)
+{
+  set_oh_length(oh);
+  get_h_pos();
+  get_waters();
+  get_hbonds();
+  populate_h_random();
+  buch_mc_correct();
+}
+
+Ice Ice::init_bulk_ordered(double oh, Cell cell, int a, int b, int c)
+{
+  Ice sc;
+  set_oh_length(oh);
+  read_h_pos(cell);
+  sc.set_oh_length(oh);
+  sc = super(a, b, c);
+  return sc;
 }
 
 void Ice::print_ice(void)
@@ -337,6 +364,17 @@ void Ice::populate_h_random(void)
   }
 }
 
+// Fix a water molecule (don't let its configuration change)
+void Ice::fix_water(int w)
+{
+  waters[w].fix();
+  get_atom(waters[w].H1).fixed = true;
+  get_atom(waters[w].H2).fixed = true;
+  get_atom(waters[w].H3).fixed = true;
+  get_atom(waters[w].H4).fixed = true;
+  get_atom(waters[w].O).fixed = true;
+}
+
 // Check the H coordination number of an oxygen
 int Ice::water_coord(int w)
 {
@@ -357,32 +395,90 @@ int Ice::hbond_occ(int hb)
   return nH;
 }
 
+// check that all hydrogen bonds are singly occupied
+int Ice::hbond_single_occupied(void)
+{
+  int n_single_occ = 0;
+  for (int i=0; i<nhbond; i++){
+    if (hbond_occ(i) == 1) n_single_occ++;
+  }
+  return n_single_occ;
+}
+
 // count the number of two-coordinated oxygens
 int Ice::o_two_coordinated(void)
 {
-  int ntwocoord = 0;
+  int n_two_coord = 0;
   for (int i=0; i<nwater; i++){
     if (water_coord(i) == 2){
-      ntwocoord++;
+      n_two_coord++;
     }
   }
-  return ntwocoord;
+  return n_two_coord;
 }
 
 // Swap the H position on a hydrogen bond
-void Ice::swap_h(int hb)
+bool Ice::swap_h(int hb)
 {
-  atoms[hbonds[hb].H1].occupied = !atoms[hbonds[hb].H1].occupied;
-  atoms[hbonds[hb].H2].occupied = !atoms[hbonds[hb].H2].occupied;
+  int H1, H2;
+  H1 = hbonds[hb].H1;
+  H2 = hbonds[hb].H2;
+  if (get_atom(H1).fixed || get_atom(H2).fixed){ 
+    return false;
+  }
+  else {
+    // get_atom(H1).toggle_occupied();
+    // get_atom(H2).toggle_occupied();
+    get_atom(H1).occupied = !get_atom(H1).occupied;
+    get_atom(H2).occupied = !get_atom(H2).occupied;
+    return true;
+  }
+}
+
+bool Ice::rotate_water(int w)
+{
+  if (waters[w].fixed) return false;
+  init_rng();
+  int H1, H2;
+  // pick two positions at random, one occupied and one unoccupied 
+  H1 = get_random_h(w);
+  bool h1_occ = get_atom(H1).occupied;
+  bool h2_occ;
+  bool done = false;
+  while (!done){
+    H2 = get_random_h(w);
+    h2_occ = get_atom(H2).occupied;
+    if (H1 == H2) continue;
+    if (h1_occ){
+      if (h2_occ){
+        continue;
+      } else {
+        break;
+      }
+    }
+    else {
+      if (h2_occ){
+        break;
+      } else {
+        continue;
+      }
+    }
+  }
+  get_atom(H1).toggle_occupied();
+  get_atom(H2).toggle_occupied();
+  return true;
 }
 
 // Monte Carlo algorithm to correct ice rules (Buch et al JCP B 102:8641, 1998)
 void Ice::buch_mc_correct(void)
 {
   std::cout << "Enforcing ice rules via Buch algorithm..." << std::endl;
-  int c1a, c2a, cdiffa, c1b, c2b, cdiffb;
+  int c1a, c2a, cdiffa, c1b, c2b, cdiffb, iter;
+  bool swapped;
+  std::string trajfilename = "trajectory.xsf";
 
   init_rng();
+  iter = 0;
   while (o_two_coordinated() != nwater){
     // Pick a random h-bond
     int hb_ind = rng_int(nhbond);
@@ -391,7 +487,7 @@ void Ice::buch_mc_correct(void)
     c2a = water_coord(hbonds[hb_ind].W2);
     cdiffa = std::abs(c1a - c2a);
     // after the h swap
-    swap_h(hb_ind);
+    swapped = swap_h(hb_ind);
     c1b = water_coord(hbonds[hb_ind].W1);
     c2b = water_coord(hbonds[hb_ind].W2);
     cdiffb = std::abs(c1b - c2b);
@@ -399,17 +495,274 @@ void Ice::buch_mc_correct(void)
     if (cdiffb - cdiffa == 0){
       // move with probability 1/2
       double rn = rng_uniform();
-      if (rn < 0.5) swap_h(hb_ind);
+      // if (rn < 0.5) swapped = swap_h(hb_ind);
+      if (rn < 0.5) {
+        swapped = swap_h(hb_ind);
+      } else{
+        if (flag_debug){
+          write_xsf(trajfilename, iter, true);
+          iter++;
+        }
+      }
     // Decrease in the coordination difference after move
     } else if (cdiffb - cdiffa < 0){
       // accept move
-
+      if (flag_debug){
+        write_xsf(trajfilename, iter, true);
+        iter++;
+      }
     // Increase in the coordination difference after move
     } else if (cdiffb - cdiffa > 0){
       // reject move
-      swap_h(hb_ind);
+      swapped = swap_h(hb_ind);
     }
   }
+  std::cout << "...done" << std::endl;
+}
+
+// Randomise the configuration, adding specified number of defects
+void Ice::add_defects(int nBjerrum, int nIonic)
+{
+  int c1a, c2a, cdiffa, c1b, c2b, cdiffb;
+  bool swapped;
+  std::string trajfilename = "trajectory.xsf";
+  if (nBjerrum > 1 || nIonic > 1){
+    throw std::runtime_error("Addition of >1 defect pair not implemented yet!");
+  }
+  init_rng();
+  std::cout << "Randomising configuration and adding defects:" << std::endl;
+  if (nBjerrum > 0){
+    std::cout << nBjerrum << " Bjerrum defect pairs" << std::endl;
+    if (nIonic > 0){
+      throw std::runtime_error("Mixture of defect types not implemented yet!");
+    }
+  }
+  if (nIonic > 0){
+    std::cout << nIonic << " Ionic defect pairs" << std::endl;
+    if (nBjerrum > 0){
+      throw std::runtime_error("Mixture of defect types not implemented yet!");
+    }
+  }
+
+  double max_dist;
+  int defect1, defect2, H1, H2;
+
+  // Pick a random oxygen atom as the first defect
+  defect1 = rng_int(nwater);
+  int o1_ind = waters[defect1].O;
+  max_dist = 0.0;
+  // Find an oxygen sufficiently far away as the second
+  std::string oxy = "O";
+  for (int at=0; at<natoms; at++){
+    if (atoms[at].name == oxy){
+      if (dt(o1_ind,at) > max_dist){
+        max_dist = dt(defect1, at);
+        defect2 = at;
+      }
+    }
+  }
+  for (int i=0; i<nwater; i++){
+    if (defect2 == waters[i].O){
+      defect2 = i;
+      break;
+    }
+  }
+
+  std::string comment = "defect";
+  int hb_ind, w_ind;
+  int iter = 0;
+  int maxiters = 100000;
+  double rn;
+
+  if (nBjerrum > 0){
+    // Pick a random h-bond attached to the molecule, add Bjerrum D defect
+    int rand_hb = rng_int(4);
+    int hb1, hb2, O1, O2;
+    hb1 = waters[defect1].hbonds[rand_hb];
+    O1 = waters[defect1].O;
+    H1 = hbonds[hb1].H1;
+    H2 = hbonds[hb1].H2;
+    if (flag_debug) std::cout << "Defect 1 indices H1: " << H1 \
+      << " H2: " << H2 << std::endl;
+    get_atom(H1).occupied = true;
+    get_atom(H2).occupied = true;
+    get_atom(H1).fixed = true;
+    get_atom(H2).fixed = true;
+    get_atom(O1).comment = comment;
+    // Pick a random h-bond attached to the molecule, add Bjerrum L defect
+    do {
+      rand_hb = rng_int(4);
+      hb2 = waters[defect2].hbonds[rand_hb];
+    } while (hb2 == hb1);
+    O2 = waters[defect2].O;
+    H1 = hbonds[hb2].H1;
+    H2 = hbonds[hb2].H2;
+    if (flag_debug) std::cout << "Defect 2 indices H1: " << H1 \
+      << " H2: " << H2 << std::endl;
+    get_atom(H1).occupied = false;
+    get_atom(H2).occupied = false;
+    get_atom(H1).fixed = true;
+    get_atom(H2).fixed = true;
+    get_atom(O2).comment = comment;
+
+    // use Buch algorithm with new constraints to enforce ice rules elsewhere
+    std::cout << "Randomising configuration via Buch algorithm..."<< std::endl;
+    while (o_two_coordinated() != nwater){
+      // Pick a random h-bond
+      hb_ind = rng_int(nhbond);
+      // before the h swap
+      c1a = water_coord(hbonds[hb_ind].W1);
+      c2a = water_coord(hbonds[hb_ind].W2);
+      cdiffa = std::abs(c1a - c2a);
+      // after the h swap
+      swapped = swap_h(hb_ind);
+      if (!swapped) continue;
+      c1b = water_coord(hbonds[hb_ind].W1);
+      c2b = water_coord(hbonds[hb_ind].W2);
+      cdiffb = std::abs(c1b - c2b);
+      //No change in the difference
+      if (cdiffb - cdiffa == 0){
+        // move with probability 1/2
+        rn = rng_uniform();
+        if (rn < 0.5) {
+          swapped = swap_h(hb_ind);
+        } else {
+          write_xsf(trajfilename, iter, true);
+          iter++;
+        }
+      // Decrease in the coordination difference after move
+      } else if (cdiffb - cdiffa < 0){
+        // accept move
+        write_xsf(trajfilename, iter, true);
+        iter++;
+      // Increase in the coordination difference after move 
+      } else if (cdiffb - cdiffa > 0){
+        // reject move
+        swapped = swap_h(hb_ind);
+      }
+      if (iter >= maxiters) {
+        std::cout << "Maximum iterations (" << maxiters  << ") reached." \
+          << std::endl;
+        break;
+      }
+    }
+  } else if (nIonic > 0){
+    bool rotated;
+    int occ, n1occa, n1occb;
+    Water w_tmp; 
+    // Add a random H to defect1 to make H3O+ ion
+    protonate_water(defect1);
+    fix_water(defect1);
+    // Remove a random H from defect2 to make OH- ion
+    deprotonate_water(defect2);
+    fix_water(defect2);
+    while (hbond_single_occupied() != nhbond){
+      // Pick a random water molecule
+      w_ind = rng_int(nwater);
+      w_tmp = waters[w_ind];
+      // before the rotation
+      n1occa = 0;
+      for (int i=0; i<4; i++){
+        occ = hbond_occ(waters[defect1].hbonds[i]);
+        n1occa++;
+      }
+      // after the rotation
+      rotated = rotate_water(w_ind);
+      if (!rotated) continue; // don't swap if a molecule is fixed
+      n1occb = 0;
+      for (int i=0; i<4; i++){
+        occ = hbond_occ(waters[defect2].hbonds[i]);
+        n1occb++;
+      }
+      // Number of singly occupied Hbonds is the same
+      if (n1occa == n1occb){
+        // move with probability 1/2
+        rn = rng_uniform();
+        if (rn < 0.5) {
+          waters[w_ind] = w_tmp; // revert the configuration
+          iter++;
+        } else {
+          iter++;
+          write_xsf(trajfilename, iter, true);
+        }
+      // Number of singly occupied H bonds increases
+      } else if (n1occa < n1occb){
+        // accept move
+        iter++;
+        write_xsf(trajfilename, iter, true);
+      // Increase in the coordination difference after move
+      } else if (n1occa > n1occb){
+        // reject move
+        // if (rn > 0.01) {
+          waters[w_ind] = w_tmp; // revert the configuration
+          iter++;
+        // } else {
+        //   iter++;
+        //   write_xsf(trajfilename, iter, true);
+        // }
+      }
+      if (iter >= maxiters) {
+        std::cout << "Maximum iterations (" << maxiters  << ") reached." \
+          << std::endl;
+        break;
+      }
+    }
+  }
+  std::cout << "...done" << std::endl;
+}
+
+// Add a random hydrogen to water w
+void Ice::protonate_water(int w)
+{
+  bool done = false;
+  int new_h;
+  while (!done){
+    new_h = get_random_h(w);
+    if (get_atom(new_h).occupied){
+      continue;
+    } else {
+      get_atom(new_h).occupied = true;
+      done = true;
+    }
+  }
+}
+
+// Remove a random hydrongen from water w
+void Ice::deprotonate_water(int w)
+{
+  bool done = false;
+  int new_h;
+  while (!done){
+    new_h = get_random_h(w);
+    if (get_atom(new_h).occupied){
+      get_atom(new_h).occupied = false;
+      done = true;
+    } else {
+      continue;
+    }
+  }
+}
+
+// Pick a random H bond from water w
+int Ice::get_random_h(int w)
+{
+  int rn = rng_int(4);
+  int rand_h;
+  switch (rn){
+    case 0:
+      rand_h = waters[w].H1;
+      break;
+    case 1:
+      rand_h = waters[w].H2;
+      break;
+    case 2:
+      rand_h = waters[w].H3;
+      break;
+    case 3:
+      rand_h = waters[w].H4;
+      break;
+  }
+  return rand_h;
 }
 
 // Return the direction of a hydrogen bond. If it is contains a Bjerrum
@@ -488,12 +841,13 @@ std::deque<Node> Ice::get_loop(int w_start)
 void Ice::rick_move(int w_start)
 {
   std::deque<Node> loop;
+  bool swapped;
   assert(w_start < nwater);
   do loop = get_loop(w_start);
   while (loop.size() < 3);
 
   for (int i=0; i<loop.size(); i++){
-    swap_h(loop[i].hbond);
+    swapped = swap_h(loop[i].hbond);
   }
 }
 
@@ -601,6 +955,27 @@ int Ice::check_bjerrum_defects(void)
     }
   }
   return nbjerrum;
+}
+
+void Ice::check_defects(void)
+{
+  std::cout << "Checking ice rules" << std::endl;
+  int nionic = check_ionic_defects();
+  int nbjerrum = check_bjerrum_defects();
+  int n_two_coord = o_two_coordinated();
+  int n_good_hbonds = hbond_single_occupied();
+
+  std::cout << n_two_coord << " / " << nwater \
+            << " two-coordinated water molecules" << std::endl;
+  std::cout << n_good_hbonds << " / " << nhbond \
+            << " singly-occupied hydrogen bonds" << std::endl;
+
+  if (nionic != 0){
+    std::cout << "WARNING: " << nionic << " ionic defects" << std::endl;
+  }
+  if (nbjerrum != 0){
+    std::cout << "WARNING: " << nbjerrum << " Bjerrum defects" << std::endl;
+  }
 }
 
 // Get the dipole vector of water w (multiply orientation vector by constant
@@ -804,6 +1179,9 @@ std::deque<int> Ice::find_dOH(int direction)
 // Compute surface order parameter
 double Ice::order_parameter(double surface_nn_cutoff)
 {
+  if (flag_debug){
+    std::cout << "Computing order parameter" << std::endl;
+  }
   int s_nn_total = 0; // running total of dangling OH surface neighbours 
   int ndOH = 0;
   int w1, w2, o1, o2;
@@ -923,6 +1301,9 @@ void Ice::build_step(std::string direction, double step_width,
                      double vacuum_gap, bool oneside, 
                      std::string fname)
 {
+  if (flag_debug){
+    std::cout << "Building step..." << std::endl;
+  }
   int dir = 0;
   std::string t = "T";
 
@@ -933,11 +1314,9 @@ void Ice::build_step(std::string direction, double step_width,
   else if (direction == "c") dir = 2;
   else std::cout << "Invalid direction" << std::endl;
 
-  int nstep = noccupied;
   int iO, iH1, iH2, iH3, iH4, layer;
   double valley_width = (lat(dir,dir) - step_width)/2.0;
   double bound_incr = 0.5;
-  double max_bound = lat(dir,dir)/2.0;
   double bound1 = valley_width;
   double bound2 = step_width + valley_width;
   double binwidth = 0.0;
@@ -967,13 +1346,6 @@ void Ice::build_step(std::string direction, double step_width,
       atoms[iH2].comment = tag;
       atoms[iH3].comment = tag;
       atoms[iH4].comment = tag;
-      // atoms[iO].remove = true;
-      // atoms[iH1].remove = true;
-      // atoms[iH2].remove = true;
-      // atoms[iH3].remove = true;
-      // atoms[iH4].remove = true;
-      // nstep -= 3;
-
     } 
     if (!oneside){
       if (waters[i].bilayer == 1) {
@@ -990,12 +1362,6 @@ void Ice::build_step(std::string direction, double step_width,
         atoms[iH2].comment = tag;
         atoms[iH3].comment = tag;
         atoms[iH4].comment = tag;
-  //       atoms[iO].remove = true;
-  //       atoms[iH1].remove = true;
-  //       atoms[iH2].remove = true;
-  //       atoms[iH3].remove = true;
-  //       atoms[iH4].remove = true;
-  //       nstep -= 3;
       }
     }
   }
@@ -1102,9 +1468,47 @@ void Ice::build_step(std::string direction, double step_width,
   // ofs.close();
 }
 
+
+// Write object to a .xsf file
+void Ice::write_xsf(std::string fname, int iter, bool append)
+{
+  std::vector<std::string> species;
+  std::ofstream outfile;
+  if (iter==0){
+    outfile.open(fname.c_str());
+  } else{
+    outfile.open(fname.c_str(), std::ios_base::app);
+  }
+
+  if (flag_debug && iter==0){
+    std::cout << "Writing ice configuration to " << fname \
+      << " (xsf)" << std::endl;
+  }
+
+  if (iter==0){
+    outfile << "ANIMSTEP " << std::endl;
+  }
+  outfile << "CRYSTAL" << std::endl;
+  outfile << "PRIMVEC   " << iter << std::endl;
+  for (int i=0; i<=2; i++) {
+    outfile << std::fixed << std::right << std::setprecision(8)
+            << lat.row(i) << std::endl;
+  }
+  outfile << "PRIMCOORD " << iter << std::endl;
+  outfile << nwater*3 << " 1" << std::endl;
+  for (int i=0; i<natoms; i++) {
+    if (atoms[i].occupied){
+      outfile << get_atom(i) << std::endl;
+    }
+  }
+}
+
 // Write object to a .cell file
 void Ice::write_cell(std::string fname)
 {
+  if (flag_debug){
+    std::cout << "Writing ice configuration to " << fname << std::endl;
+  }
   std::ofstream outfile(fname.c_str());
 
   if (outfile.fail()) {
@@ -1120,18 +1524,25 @@ void Ice::write_cell(std::string fname)
   if (frac) outfile << "%BLOCK positions_frac" << std::endl;
   else outfile << "%BLOCK positions_abs" << std::endl;
 
+  std::string comment = "defect";
+  std::string newname = "N";
   for (int i=0; i<nwater; i++) {
-    outfile << get_atom(waters[i].O) << std::endl;
+    // outfile << get_atom(waters[i].O) << std::endl;
+    outfile << get_atom(waters[i].O).write_cell_highlight(newname, comment) << std::endl;
     if (atoms[waters[i].H1].occupied){
+      // outfile << get_atom(waters[i].H1).write_cell_highlight(newname) << std::endl;
       outfile << get_atom(waters[i].H1) << std::endl;
     }
     if (atoms[waters[i].H2].occupied){
+      // outfile << get_atom(waters[i].H2).write_cell_highlight(newname) << std::endl;
       outfile << get_atom(waters[i].H2) << std::endl;
     }
     if (atoms[waters[i].H3].occupied){
+      // outfile << get_atom(waters[i].H3).write_cell_highlight(newname) << std::endl;
       outfile << get_atom(waters[i].H3) << std::endl;
     }
     if (atoms[waters[i].H4].occupied){
+      // outfile << get_atom(waters[i].H4).write_cell_highlight(newname) << std::endl;
       outfile << get_atom(waters[i].H4) << std::endl;
     }
   }
