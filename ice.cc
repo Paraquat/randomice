@@ -10,6 +10,17 @@ Ice::~Ice()
 {
 }
 
+Ice::Ice(const Ice& ice)
+{
+  lat = ice.lat;
+  lat_inv = lat.inverse();
+  atoms = ice.atoms;
+  natoms = ice.natoms;
+  frac = ice.frac;
+  ghost_method = false;
+  nwater = 0;
+}
+
 Ice::Ice(Cell& cell)
 {
   lat = cell.lat;
@@ -38,12 +49,12 @@ void Ice::read_h_pos(Cell& cell)
   assert(frac == true);
 
   // Add the oxygen atoms
-  for (int i=1; i<cell.natoms; i++){
+  for (int i=0; i<cell.natoms; i++){
     if (cell.atoms[i].name == "O"){
       add_atom(cell.atoms[i]);
     }
   }
-  if (natoms < 20) ghost_method = true;
+  if (natoms < 30) ghost_method = true;
   get_h_pos();
   get_waters();
   cart2frac_all();
@@ -109,6 +120,58 @@ Ice Ice::super(int a, int b, int c)
   std::string fname = "test.cell";
   ice_sc.write_cell(fname);
   return ice_sc; 
+}
+
+// Convert self to a supercell
+void Ice::super_self(int a, int b, int c)
+{
+  Eigen::Vector3d t, rt;
+  Eigen::Matrix3d lat_super;
+
+  std::cout << "Making supercell" << std::endl;
+
+  Ice ice_unit(*this);
+  ice_unit.get_waters();
+  // ice_unit.print_ice();
+
+  assert(frac == true);
+  lat_super.row(0) = lat.row(0)*static_cast<double>(a);
+  lat_super.row(1) = lat.row(1)*static_cast<double>(b);
+  lat_super.row(2) = lat.row(2)*static_cast<double>(c);
+  lat = lat_super;
+  lat_inv = lat.inverse();
+
+
+  int natoms_old = natoms;
+  atoms.clear();
+  natoms = 0;
+  waters.clear();
+  nwater = 0;
+
+  scdim << static_cast<double>(a), static_cast<double>(b), \
+           static_cast<double>(c);
+  int label = 1;
+  for (int i=0; i<a; i++){
+    for (int j=0; j<b; j++){
+      for (int k=0; k<c; k++){
+        t << static_cast<double>(i), static_cast<double>(j), \
+             static_cast<double>(k);
+
+        for (int n=0; n<natoms_old; n++){
+          rt = ice_unit.atoms[n].r + t;
+          for (int m=0; m<=2; m++){
+            rt(m) = rt(m)/scdim(m);
+          }
+          Atom a(ice_unit.atoms[n].name, label, rt, 
+                 ice_unit.atoms[n].occupied);
+          if (a.occupied) noccupied++;
+          add_atom(a);
+        }
+      }
+    }
+  }
+  ghost_method = false;
+  get_waters();
 }
 
 // Compute all hydrogen positions for a given oxygen lattice
@@ -304,14 +367,11 @@ void Ice::init_bulk_random(double oh)
   buch_mc_correct();
 }
 
-Ice Ice::init_bulk_ordered(double oh, Cell cell, int a, int b, int c)
+void Ice::init_bulk_ordered(double oh, Cell cell, int a, int b, int c)
 {
-  Ice sc;
   set_oh_length(oh);
   read_h_pos(cell);
-  sc.set_oh_length(oh);
-  sc = super(a, b, c);
-  return sc;
+  super_self(a, b, c);
 }
 
 void Ice::print_ice(void)
@@ -1442,30 +1502,6 @@ void Ice::build_step(std::string direction, double step_width,
     }
   }
   ofs.close();
-
-  // ofs.open(file_step);
-  // if (ofs.fail()) {
-  //   std::cout << "Error opening file " << file_step << std::endl;
-  // }
-  // ofs << std::fixed << std::setw(14) << std::setprecision(8) \
-  //     << std::left << lat.row(0)*ang2bohr << std::endl \
-  //     << std::left << lat.row(1)*ang2bohr << std::endl \
-  //     // << lat_c(0) << lat_c(1) << lat_c(2) << std::endl;
-  //     << std::left << std::setw(14) << lat_c(0) \
-  //     << std::left << std::setw(14) << lat_c(1) \
-  //     << std::left << std::setw(14) << lat_c(2) << std::endl;
-  // ofs << nstep << std::endl;
-  // for (int i=0; i<natoms; i++){
-  //   if (atoms[i].occupied){
-  //     if (!atoms[i].remove){
-  //       if (atoms[i].name == "H") species_label = 1;
-  //       else if (atoms[i].name == "O") species_label = 2;
-  //       atom_str = atoms[i].write_cq(species_label, t, t, t);
-  //       ofs << atom_str << std::endl;
-  //     }
-  //   }
-  // }
-  // ofs.close();
 }
 
 

@@ -4,6 +4,19 @@ namespace po = boost::program_options;
 
 bool flag_debug;
 
+void handler(int sig) {
+  void *array[20];
+  size_t size;
+
+  // get void*s for all entries on the stack
+  size = backtrace(array, 20);
+
+  // print out all frames to stderr
+  fprintf(stderr, "Error: signal %d:\n", sig);
+  backtrace_symbols_fd(array, size, STDERR_FILENO);
+  exit(1);
+}
+
 int main(int argc, char* argv[]){
 
   po::options_description desc("Allowed options");
@@ -24,6 +37,7 @@ int main(int argc, char* argv[]){
   bool randomise = false;
   double oh = oh_default;
 
+  signal(SIGSEGV, handler);
 
   desc.add_options()
     ("help,h", "Print help information")
@@ -122,7 +136,13 @@ int main(int argc, char* argv[]){
 
   // Generate the bulk ice supercell
   cell.read_cell(infname);
-  double dhkl = cell.lat(2,2)/2.0;
+  double dhkl = cell.lat(2,2);
+  if (phase == "Ih"){
+    dhkl = cell.lat(2,2)/2.0;
+  }
+  else if (phase == "Ic"){
+    dhkl = cell.lat(2,2)/3.0;
+  }
   Ice* ice;
 
   if (ordered){
@@ -214,9 +234,14 @@ int main(int argc, char* argv[]){
     ice -> check_defects();
   } else if (step){
     std::cout << "Building slab with step" << std::endl;
+    ice -> build_slab(dhkl, 2);
     if (phase == "Ih"){
       ice -> xlayers = 2*scx;
       ice -> ylayers = 2*scy;    
+    }
+    else if (phase == "Ic"){
+      ice -> xlayers = 2*scx;
+      ice -> ylayers = 2*scy;
     }
     std::string fname = "ice";
     ice -> build_step(step_direction, step_width, vacuum_gap, oneside, fname);

@@ -35,18 +35,20 @@ class Ice: public Cell {
 
     Ice();
     virtual ~Ice();
+    Ice(const Ice&);
     Ice(Cell&);
 
     void set_oh_length(double);
     void read_h_pos(Cell&);
     Ice super(int, int, int);
+    void super_self(int, int, int);
     void get_h_pos(void);
     void add_water(Water&);
     void add_hbond(Hbond&);
     void get_waters(void);
     void get_hbonds(void);
     void init_bulk_random(double);
-    Ice init_bulk_ordered(double, Cell, int, int, int);
+    void init_bulk_ordered(double, Cell, int, int, int);
     void print_ice(void);
 
     void init_rng(void);
