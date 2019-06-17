@@ -22,7 +22,7 @@ int main(int argc, char* argv[]){
   po::options_description desc("Allowed options");
   std::string infname, phase;
   std::vector<int> scdim;
-  int scx, scy, scz, nBjerrum, nIonic;
+  int scx, scy, scz, nBjerrum, nIonic, slices;
   int maxiter = 1000;
   bool cq_out = false;
   bool ordered = false;
@@ -65,6 +65,7 @@ int main(int argc, char* argv[]){
     ("randomise,r", po::bool_switch(&randomise), "Randomise an existing cell")
     ("nBjerrum", po::value< int >(), "Number of Bjerrum defect pairs")
     ("nIonic", po::value< int >(), "Number of ionic defect pairs")
+    ("slices", po::value< int >(), "Number of steps of varying d to generate")
     ;
   po::variables_map vm;
   po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -109,6 +110,11 @@ int main(int argc, char* argv[]){
     nIonic = vm["nIonic"].as<int>();
   } else {
     nIonic = 0;
+  }
+  if (vm.count("slices")){
+    slices = vm["slices"].as<int>();
+  } else {
+    slices = 0;
   }
 
   if (bulk) std::cout << "Generating bulk ice" << std::endl;
@@ -235,16 +241,9 @@ int main(int argc, char* argv[]){
   } else if (step){
     std::cout << "Building slab with step" << std::endl;
     ice -> build_slab(dhkl, 2);
-    if (phase == "Ih"){
-      ice -> xlayers = 2*scx;
-      ice -> ylayers = 2*scy;    
-    }
-    else if (phase == "Ic"){
-      ice -> xlayers = 2*scx;
-      ice -> ylayers = 2*scy;
-    }
     std::string fname = "ice";
-    ice -> build_step(step_direction, step_width, vacuum_gap, oneside, fname);
+    ice -> build_step(step_direction, slices, step_width, vacuum_gap, 
+                      oneside, fname);
   }
 
   return 0;

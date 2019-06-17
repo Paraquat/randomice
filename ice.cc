@@ -1357,9 +1357,9 @@ void Ice::build_ordered_slab(double dhkl, int direction, double target_cOH, int 
 
 // Construct a step: compute which atoms to remove, and move them to 
 // the bottom of the file
-void Ice::build_step(std::string direction, double step_width, 
-                     double vacuum_gap, bool oneside, 
-                     std::string fname)
+void Ice::build_step(std::string direction, int layers, 
+                     double step_width, double vacuum_gap,
+                     bool oneside, std::string fname)
 {
   if (flag_debug){
     std::cout << "Building step..." << std::endl;
@@ -1380,11 +1380,7 @@ void Ice::build_step(std::string direction, double step_width,
   double bound1 = valley_width;
   double bound2 = step_width + valley_width;
   double binwidth = 0.0;
-  if (dir == 0){
-    binwidth = lat(dir,dir)/static_cast<double>(xlayers);
-  } else if (dir == 1) {
-    binwidth = lat(dir,dir)/static_cast<double>(ylayers);
-  }
+  binwidth = lat(dir,dir)/static_cast<double>(layers);
 
   bound1 = bound_incr;
   bound2 = lat(dir,dir) - bound_incr;

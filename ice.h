@@ -85,7 +85,7 @@ class Ice: public Cell {
     std::deque<int> find_dOH(int);
     double order_parameter(double);
     void build_ordered_slab(double, int, double, int);
-    void build_step(std::string, double, double, bool, std::string);
+    void build_step(std::string, int, double, double, bool, std::string);
 
     void write_xsf(std::string, int, bool);
     void write_cell(std::string);
