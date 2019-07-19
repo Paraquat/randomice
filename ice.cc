@@ -610,19 +610,20 @@ void Ice::add_defects(int nBjerrum, int nIonic)
   // Pick a random oxygen atom as the first defect
   defect1 = rng_int(nwater);
   int o1_ind = waters[defect1].O;
+  int o2_ind;
   max_dist = 0.0;
   // Find an oxygen sufficiently far away as the second
   std::string oxy = "O";
   for (int at=0; at<natoms; at++){
     if (atoms[at].name == oxy){
       if (dt(o1_ind,at) > max_dist){
-        max_dist = dt(defect1, at);
-        defect2 = at;
+        max_dist = dt(o1_ind, at);
+        o2_ind = at;
       }
     }
   }
   for (int i=0; i<nwater; i++){
-    if (defect2 == waters[i].O){
+    if (o2_ind == waters[i].O){
       defect2 = i;
       break;
     }
@@ -707,65 +708,38 @@ void Ice::add_defects(int nBjerrum, int nIonic)
       }
     }
   } else if (nIonic > 0){
-    bool rotated;
-    int occ, n1occa, n1occb;
-    Water w_tmp; 
-    // Add a random H to defect1 to make H3O+ ion
-    protonate_water(defect1);
-    fix_water(defect1);
-    // Remove a random H from defect2 to make OH- ion
-    deprotonate_water(defect2);
-    fix_water(defect2);
-    while (hbond_single_occupied() != nhbond){
-      // Pick a random water molecule
-      w_ind = rng_int(nwater);
-      w_tmp = waters[w_ind];
-      // before the rotation
-      n1occa = 0;
-      for (int i=0; i<4; i++){
-        occ = hbond_occ(waters[defect1].hbonds[i]);
-        n1occa++;
-      }
-      // after the rotation
-      rotated = rotate_water(w_ind);
-      if (!rotated) continue; // don't swap if a molecule is fixed
-      n1occb = 0;
-      for (int i=0; i<4; i++){
-        occ = hbond_occ(waters[defect2].hbonds[i]);
-        n1occb++;
-      }
-      // Number of singly occupied Hbonds is the same
-      if (n1occa == n1occb){
-        // move with probability 1/2
-        rn = rng_uniform();
-        if (rn < 0.5) {
-          waters[w_ind] = w_tmp; // revert the configuration
-          iter++;
-        } else {
-          iter++;
-          write_xsf(trajfilename, iter, true);
+    // Similar to the Rick algorithm, except without a closed loops
+    // Generates one ionic defect pair and no Bjerrum defects
+    w_ind = rng_int(nwater);
+    int current, hb, target;
+    bool end = false;
+    std::deque<Node> loop;
+
+    current = defect1;
+    while (true){
+      hb = rng_int(4);
+      target = hb_target(waters[current].hbonds[hb]);
+      if (target != current) break;
+    }
+    loop.push_back(Node(current, waters[current].hbonds[hb]));
+
+    while (true){
+      end = false;
+      while (true){
+        hb = rng_int(4);
+        target = hb_target(waters[current].hbonds[hb]);
+        if (target == defect2) end = true;
+        for (int j=0; j<loop.size(); j++){
+          if (target == loop[j].water) continue;
         }
-      // Number of singly occupied H bonds increases
-      } else if (n1occa < n1occb){
-        // accept move
-        iter++;
-        write_xsf(trajfilename, iter, true);
-      // Increase in the coordination difference after move
-      } else if (n1occa > n1occb){
-        // reject move
-        // if (rn > 0.01) {
-          waters[w_ind] = w_tmp; // revert the configuration
-          iter++;
-        // } else {
-        //   iter++;
-        //   write_xsf(trajfilename, iter, true);
-        // }
+        if (target != current) break;
       }
-      if (iter >= maxiters) {
-        std::cout << "Maximum iterations (" << maxiters  << ") reached." \
-          << std::endl;
-        break;
-      }
+      loop.push_back(Node(current, waters[current].hbonds[hb]));
+      current = target;
+      if (end) break;
+    }
+    for (int i=0; i<loop.size(); i++){
+      swapped = swap_h(loop[i].hbond);
     }
   }
   std::cout << "...done" << std::endl;
