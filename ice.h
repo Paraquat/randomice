@@ -2,7 +2,6 @@
 #include "water.h"
 #include "hbond.h"
 #include <vector>
-#include <boost/progress.hpp>
 #include <boost/format.hpp>
 
 struct Node {

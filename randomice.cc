@@ -23,7 +23,7 @@ int main(int argc, char* argv[]){
   std::string infname, phase;
   std::vector<int> scdim;
   int scx, scy, scz, nBjerrum, nIonic, slices;
-  int maxiter = 1000;
+  int maxiter = 10000;
   bool cq_out = false;
   bool ordered = false;
   bool defect = false;
@@ -36,6 +36,7 @@ int main(int argc, char* argv[]){
   bool frac = false;
   bool randomise = false;
   double oh = oh_default;
+  int cOH = cOH_default;
 
   signal(SIGSEGV, handler);
 
@@ -58,6 +59,7 @@ int main(int argc, char* argv[]){
     ("frac", po::bool_switch(&frac), "Output in fractional coordinates")
     ("step_direction", po::value< std::string >(), "Direction of step (a,b,c)")
     ("OH", po::value< double >(), "OH bond length")
+    ("cOH,c", po::value< double >(), "Surface order parameter")
     ("step_width", po::value< double >(), "Width of step (a0)")
     ("vacuum_gap", po::value< double >(), "Size of vacuum gap (a0)")
     ("supercell,s", po::value<std::vector<int> >() -> multitoken(), 
@@ -100,6 +102,9 @@ int main(int argc, char* argv[]){
   }
   if (vm.count("OH")){
     oh = vm["OH"].as<double>();
+  }
+  if (vm.count("cOH")){
+    cOH = vm["cOH"].as<double>();
   }
   if (vm.count("nBjerrum")){
     nBjerrum = vm["nBjerrum"].as<int>();
@@ -173,58 +178,6 @@ int main(int argc, char* argv[]){
   else if (vasp_out) ice -> write_vasp("iceIh.vasp");
   else if (castep_out) ice -> write_cell("iceIh.cell");
 
-  // if (ordered){
-  //   std::cout << "Reading initial hydrogen positions from file" << std::endl;
-  //   Ice unit;
-  //   unit.set_oh_length(oh);
-  //   unit.read_h_pos(cell);
-  //   ice.set_oh_length(oh);
-  //   Ice* ice_sc = new Ice:
-  //   ice = unit.super(scx, scy, scz);
-
-  // } else if (defect){
-  //   std::cout << "Generating bulk ice with defect pair(s)" << std::endl;
-  //   Cell sc;
-  //   sc = cell.super(scx, scy, scz);
-  //   // Ice ice(sc);
-  //   Ice* ice_defect = new Ice(sc);
-  //   ice.set_oh_length(oh);
-  //   ice.get_h_pos();
-  //   ice.get_waters();
-  //   ice.get_hbonds();
-
-  //   std::cout << ice.nwater << " waters" << std::endl;
-  //   std::cout << ice.nhbond << " hydrogen bonds" << std::endl;
-
-  //   ice.populate_h_random();
-  //   ice.add_defects(nBjerrum, nIonic);
-
-  // } else{
-  //   std::cout << "Generating proton disordered bulk ice Ih" << std::endl;
-  //   Cell sc;
-  //   sc = cell.super(scx, scy, scz);
-  //   Ice ice(sc);
-  //   ice.set_oh_length(oh);
-  //   ice.get_h_pos();
-  //   ice.get_waters();
-  //   ice.get_hbonds();
-
-  //   ice.populate_h_random();
-  //   ice.buch_mc_correct();
-  //   // ice.write_cell("init.cell");
-  //   int nionic = ice.check_ionic_defects();
-  //   int nbjerrum = ice.check_bjerrum_defects();
-  //   if (nionic != 0){
-  //     std::cout << "WARNING: " << nionic << " ionic defects" << std::endl;
-  //   }
-  //   if (nbjerrum != 0){
-  //     std::cout << "WARNING: " << nbjerrum << " Bjerrum defects" << std::endl;
-  //   }
-  //   if (cq_out) ice.write_cq("iceIh.coord");
-  //   else if (vasp_out) ice.write_vasp("iceIh.vasp");
-  //   else if (castep_out) ice.write_cell("iceIh.cell");
-  // }
-
   if (slab){ // Construct the slab and/or step
     std::deque<int> slist;
     for (int i=0; i<ice -> s1list.size(); i++) slist.push_back(ice -> s1list[i]);
@@ -236,11 +189,26 @@ int main(int argc, char* argv[]){
     ice -> order_parameter(surface_nn_cut);
 
     std::cout << "Building surface-ordered slab" << std::endl;
-    ice -> build_ordered_slab(dhkl, 2, 2.0, maxiter);
+    ice -> build_ordered_slab(dhkl, 2, cOH, maxiter);
     ice -> check_defects();
   } else if (step){
     std::cout << "Building slab with step" << std::endl;
-    ice -> build_slab(dhkl, 2);
+    if (ordered){
+      ice -> build_slab(dhkl, 2);
+    } else {
+      std::deque<int> slist;
+      for (int i=0; i<ice -> s1list.size(); i++) slist.push_back(ice -> s1list[i]);
+      for (int i=0; i<ice -> s2list.size(); i++) slist.push_back(ice -> s2list[i]);
+
+      ice -> write_highlight_cell("surface.cell", slist);
+      std::deque<int> dOHlist = ice -> find_dOH(2);
+      ice -> write_highlight_cell("dOH.cell", dOHlist);
+      ice -> order_parameter(surface_nn_cut);
+
+      std::cout << "Building surface-ordered slab" << std::endl;
+      ice -> build_ordered_slab(dhkl, 2, cOH, maxiter);
+      ice -> order_parameter(surface_nn_cut);
+    }
     std::string fname = "ice";
     ice -> build_step(step_direction, slices, step_width, vacuum_gap, 
                       oneside, fname);

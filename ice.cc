@@ -894,7 +894,6 @@ void Ice::rick_randomise(int max_loops)
   double cell_dipole, cell_dipole_old, rn, mcp;
   std::vector<bool> conf;
   unsigned int loop = 0;
-  boost::progress_display show_progress(loop);
 
   init_rng();
 
@@ -926,7 +925,6 @@ void Ice::rick_randomise(int max_loops)
       std::cout << "Iteration " << loop << ": Cell dipole = " 
                 << cell_dipole_old << std::endl;
     }
-    else ++show_progress;
     if (cell_dipole < cell_dipole_thresh) break;
     cell_dipole_old = cell_dipole;
   }
@@ -1088,41 +1086,44 @@ void Ice::build_slab(double dhkl, int direction)
     }
   }
 
-  // Shift all atoms such that bilayer 1 is at the bottom of the cell
-  // double rbilayer1 = get_atom(waters[ibilayer1].O).r(direction);
-  // double lshift = -rbilayer1 + dhkl/2.0;
-  // switch(direction){
-  //   case 0:
-  //     shift(lshift, 0.0, 0.0);
-  //   case 1:
-  //     shift(0.0, lshift, 0.0);
-  //   case 2:
-  //     shift(0.0, 0.0, lshift);
-  // }
+  double min = lat(direction, direction);
+  double max = 0.0;
+  // find the surface oxygens
+  for (int i=0; i<nwater; i++){
+    r = get_atom(waters[i].O).r(direction);
+    if (r < min){
+      min = r;
+    }
+    if (r > max){
+      max = r;
+    }
+  }
 
   // label the surface water molecules
-  double ormin = lat(direction, direction);
-  double ormax = 0.0;
-  double thresh = 0.1;
+  double thresh = 0.2;
   for (int i=0; i<nwater; i++){
     r = get_atom(waters[i].O).r(direction);
-    if (r < ormin) ormin = r;
-    if (r > ormax) ormax = r;
-  }
-  for (int i=0; i<nwater; i++){
-    r = get_atom(waters[i].O).r(direction);
-    if (r < (ormin+thresh)){
-      waters[i].surface1 = true; 
-      waters[i].step = 0;
+    if (std::abs(r - min) < thresh){
+      waters[i].surface1 = true;
       s1list.push_back(i);
+    } else {
+      waters[i].surface1 = false;
     }
-    else waters[i].surface1 = false;
-    if (r > (ormax-thresh)){
+    if (std::abs(r - max) < thresh){
       waters[i].surface2 = true;
       s2list.push_back(i);
+    } else {
+      waters[i].surface2 = false;
     }
-    else waters[i].surface2 = false;
   }
+
+  std::deque<int> slist;
+
+  for (int i=0; i<s1list.size(); i++){
+    slist.push_back(s1list[i]);
+    slist.push_back(s2list[i]);
+  }
+  write_highlight_cell("surface.cell", slist);
 }
 
 // Find and label dangling H
@@ -1213,9 +1214,6 @@ std::deque<int> Ice::find_dOH(int direction)
 // Compute surface order parameter
 double Ice::order_parameter(double surface_nn_cutoff)
 {
-  if (flag_debug){
-    std::cout << "Computing order parameter" << std::endl;
-  }
   int s_nn_total = 0; // running total of dangling OH surface neighbours 
   int ndOH = 0;
   int w1, w2, o1, o2;

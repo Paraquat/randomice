@@ -8,8 +8,8 @@ const double oo_max = 3.0;
 const double oh_max = 1.1;
 const double ice_h2o_dipole_mag = 3.09;
 const double cell_dipole_thresh = 1E-3;
-const double dhkl_default = 3.5104;
 const double surface_nn_cut = 4.6;
 const double cOH_thresh = 0.1;
 const double ang2bohr = 1.8897259885789;
+const double cOH_default = 2.0;
 #endif
